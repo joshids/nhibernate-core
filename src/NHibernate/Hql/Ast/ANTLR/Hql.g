@@ -2,7 +2,7 @@ grammar Hql;
 
 options
 {
-	language=CSharp2;
+	language=CSharp3;
 	output=AST;
 	ASTLabelType=IASTNode;
 }
@@ -126,8 +126,12 @@ tokens
 using NHibernate.Hql.Ast.ANTLR.Tree;
 }
 
-statement
-	: ( updateStatement | deleteStatement | selectStatement | insertStatement ) EOF!
+public statement
+	:
+	(
+		{ !filter }? ( updateStatement | deleteStatement | insertStatement ) // DML statements are not allowed for collection-filtering queries
+		| selectStatement
+	) EOF!
 	;
 
 updateStatement
@@ -199,6 +203,12 @@ insertablePropertySpec
 //##     [selectClause] fromClause [whereClause] [groupByClause] [havingClause] [orderByClause] [skipClause] [takeClause];
 
 queryRule
+	@init {
+		++queryDepth;
+	}
+	@after {
+		--queryDepth;
+	}
 	: selectFrom
 		(whereClause)?
 		(groupByClause)?
@@ -211,7 +221,7 @@ queryRule
 selectFrom
 	:  (s=selectClause)? (f=fromClause)? 
 		{
-			if ($f.tree == null && !filter) 
+			if ($f.tree == null && !(filter && queryDepth == 1)) 
 				throw new RecognitionException("FROM expected (non-filter queries must contain a FROM clause)");
 		}
 		-> {$f.tree == null && filter}? ^(SELECT_FROM FROM["{filter-implied FROM}"] selectClause?)
@@ -249,6 +259,9 @@ fromJoin
 
 withClause
 	: WITH^ logicalExpression
+	| ON logicalExpression 
+	// it's really just a WITH clause, so treat it as such...
+		-> ^(WITH["with"] logicalExpression)
 	;
 
 fromRange
@@ -291,7 +304,7 @@ alias
 
 propertyFetch
 	: FETCH ALL! PROPERTIES!
-	;
+	| (FETCH path)+;
 
 groupByClause
 	: GROUP^ 
@@ -393,7 +406,6 @@ negatedExpression
 	: NOT x=negatedExpression
 		-> ^({NegateNode($x.tree)})
 	| equalityExpression
-		-> ^(equalityExpression)
 	;
 
 //## OP: EQ | LT | GT | LE | GE | NE | SQL_NE | LIKE;
@@ -509,28 +521,36 @@ multiplyExpression
 unaryExpression
 	: m=MINUS mu=unaryExpression -> ^(UNARY_MINUS[$m] $mu)
 	| p=PLUS pu=unaryExpression -> ^(UNARY_PLUS[$p] $pu)
-	| c=caseExpression -> ^($c)
-	| q=quantifiedExpression -> ^($q) 
-	| a=atom -> ^($a)
+	| caseExpression
+	| quantifiedExpression
+	| atom
 	;
 	
 caseExpression
-	: CASE (whenClause)+ (elseClause)? END
-		-> ^(CASE whenClause+ elseClause?) 
-	| CASE unaryExpression (altWhenClause)+ (elseClause)? END
-		-> ^(CASE2 unaryExpression altWhenClause+ elseClause?)
+	: simpleCaseStatement
+	| searchedCaseStatement
 	;
-	
-whenClause
-	: (WHEN^ logicalExpression THEN! expression)
+
+simpleCaseStatement
+	: CASE expression (simpleCaseWhenClause)+ (elseClause)? END
+		-> ^(CASE2 expression simpleCaseWhenClause+ elseClause?)
 	;
-	
-altWhenClause
-	: (WHEN^ unaryExpression THEN! expression)
+
+simpleCaseWhenClause
+	: (WHEN^ expression THEN! expression)
 	;
 	
 elseClause
 	: (ELSE^ expression)
+	;
+
+searchedCaseStatement
+	: CASE (searchedCaseWhenClause)+ (elseClause)? END
+		-> ^(CASE searchedCaseWhenClause+ elseClause?)
+	;
+
+searchedCaseWhenClause
+	: (WHEN^ logicalExpression THEN! expression)
 	;
 	
 quantifiedExpression
@@ -566,7 +586,7 @@ primaryExpression
 expressionOrVector!
 	: e=expression ( v=vectorExpr )? 
 	-> {v != null}? ^(VECTOR_EXPR["{vector}"] $e $v)
-	-> ^($e)
+	-> $e
 	;
 
 vectorExpr
@@ -591,13 +611,17 @@ identPrimary
 //## aggregateFunction:
 //##     COUNT | 'sum' | 'avg' | 'max' | 'min';
 aggregate
-	: ( op=SUM | op=AVG | op=MAX | op=MIN ) OPEN additiveExpression CLOSE
-		-> ^(AGGREGATE[$op] additiveExpression)
+	: ( op=SUM | op=AVG | op=MAX | op=MIN ) OPEN aggregateArgument CLOSE
+		-> ^(AGGREGATE[$op] aggregateArgument)
 	// Special case for count - It's 'parameters' can be keywords.
 	|  COUNT OPEN ( s=STAR | p=aggregateDistinctAll ) CLOSE
 		-> {s == null}? ^(COUNT $p)
 		-> ^(COUNT ^(ROW_STAR["*"]))
 	|  collectionExpr
+	;
+
+aggregateArgument
+	: ( additiveExpression | selectStatement )
 	;
 
 aggregateDistinctAll
@@ -759,11 +783,11 @@ NUM_INT
 	:   '.' {_type = DOT;}
 			(	('0'..'9')+ (EXPONENT)? (f1=FLOAT_SUFFIX {t=f1;})?
 				{
-					if (t != null && t.Text.ToUpperInvariant().IndexOf('F')>=0)
+					if (t != null && t.Text.IndexOf("F", System.StringComparison.OrdinalIgnoreCase)>=0)
 					{
 						_type = NUM_FLOAT;
 					}
-					else if (t != null && t.Text.ToUpperInvariant().IndexOf('M')>=0)
+					else if (t != null && t.Text.IndexOf("M", System.StringComparison.OrdinalIgnoreCase)>=0)
 					{
 						_type = NUM_DECIMAL;
 					}
@@ -797,11 +821,11 @@ NUM_INT
 			|   f4=FLOAT_SUFFIX {t=f4;}
 			)
 			{
-				if (t != null && t.Text.ToUpperInvariant().IndexOf('F') >= 0)
+				if (t != null && t.Text.IndexOf("F", System.StringComparison.OrdinalIgnoreCase) >= 0)
 				{
 					_type = NUM_FLOAT;
 				}
-				else if (t != null && t.Text.ToUpperInvariant().IndexOf('M')>=0)
+				else if (t != null && t.Text.IndexOf("M", System.StringComparison.OrdinalIgnoreCase)>=0)
 				{
 					_type = NUM_DECIMAL;
 				}

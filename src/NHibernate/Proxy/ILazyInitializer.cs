@@ -2,7 +2,7 @@ using NHibernate.Engine;
 
 namespace NHibernate.Proxy
 {
-	public interface ILazyInitializer
+	public partial interface ILazyInitializer
 	{
 		/// <summary>
 		/// Perform an ImmediateLoad of the actual object for the Proxy.
@@ -20,7 +20,7 @@ namespace NHibernate.Proxy
 		/// <summary>
 		/// The entity-name of the entity our owning proxy represents.
 		/// </summary>
-		string EntityName { get;}
+		string EntityName { get; }
 
 		/// <summary>
 		/// Get the actual class of the entity.  Generally, <see cref="EntityName" /> should be used instead.
@@ -28,7 +28,7 @@ namespace NHibernate.Proxy
 		System.Type PersistentClass { get; }
 
 		/// <summary>
-		/// Is the proxy uninitialzed?
+		/// Is the proxy uninitialized?
 		/// </summary>
 		bool IsUninitialized { get; }
 

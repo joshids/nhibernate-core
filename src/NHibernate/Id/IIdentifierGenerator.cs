@@ -8,7 +8,6 @@ namespace NHibernate.Id
 		public readonly static string EntityName = "entity_name";
 	}
 
-
 	/// <summary>
 	/// The general contract between a class that generates unique
 	/// identifiers and the <see cref="ISession"/>.
@@ -30,7 +29,7 @@ namespace NHibernate.Id
 	/// Implementors <b>must</b> be threadsafe.
 	/// </para>
 	/// </remarks>
-	public interface IIdentifierGenerator
+	public partial interface IIdentifierGenerator
 	{
 		/// <summary>
 		/// Generate a new identifier

@@ -1,13 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Data;
+using System.Data.Common;
 using NHibernate.Engine;
 using NHibernate.SqlCommand;
 using NHibernate.Type;
 
 namespace NHibernate.Param
 {
-	public abstract class AbstractExplicitParameterSpecification : IPageableParameterSpecification
+	public abstract partial class AbstractExplicitParameterSpecification : IPageableParameterSpecification
 	{
 		private readonly int sourceColumn;
 		private readonly int sourceLine;
@@ -43,8 +43,8 @@ namespace NHibernate.Param
 
 		public abstract string RenderDisplayInfo();
 		public abstract IEnumerable<string> GetIdsForBackTrack(IMapping sessionFactory);
-		public abstract void Bind(IDbCommand command, IList<Parameter> sqlQueryParametersList, QueryParameters queryParameters, ISessionImplementor session);
-		public abstract void Bind(IDbCommand command, IList<Parameter> multiSqlQueryParametersList, int singleSqlParametersOffset, IList<Parameter> sqlQueryParametersList, QueryParameters queryParameters, ISessionImplementor session);
+		public abstract void Bind(DbCommand command, IList<Parameter> sqlQueryParametersList, QueryParameters queryParameters, ISessionImplementor session);
+		public abstract void Bind(DbCommand command, IList<Parameter> multiSqlQueryParametersList, int singleSqlParametersOffset, IList<Parameter> sqlQueryParametersList, QueryParameters queryParameters, ISessionImplementor session);
 		public abstract void SetEffectiveType(QueryParameters queryParameters);
 		public abstract int GetSkipValue(QueryParameters queryParameters);
 
@@ -70,9 +70,7 @@ namespace NHibernate.Param
 			if (ExpectedType != null)
 			{
 				// TODO: we have to find a way to set all expected types during the query parsing
-				var paremeterSpan = ExpectedType.GetColumnSpan(sessionFactory);
-				// NOTE: the OneToOneType does not return the real ColumnSpan
-				return paremeterSpan == 0 ? 1 : paremeterSpan;
+				return ExpectedType.GetColumnSpan(sessionFactory);
 			}
 			// TODO: (see above) when the ExpectedType is null we will set the BackTrackId just for the first position (not a big problem because IType does not support something different... so far)
 			return 1;

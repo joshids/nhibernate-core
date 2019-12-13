@@ -14,9 +14,9 @@ using IQueryable = NHibernate.Persister.Entity.IQueryable;
 namespace NHibernate.Hql.Ast.ANTLR.Exec
 {
 	[CLSCompliant(false)]
-	public class MultiTableDeleteExecutor : AbstractStatementExecutor
+	public partial class MultiTableDeleteExecutor : AbstractStatementExecutor
 	{
-		private static readonly IInternalLogger log = LoggerProvider.LoggerFor(typeof(MultiTableDeleteExecutor));
+		private static readonly INHibernateLogger log = NHibernateLogger.For(typeof(MultiTableDeleteExecutor));
 		private readonly IQueryable persister;
 		private readonly SqlString idInsertSelect;
 		private readonly SqlString[] deletes;
@@ -36,10 +36,10 @@ namespace NHibernate.Hql.Ast.ANTLR.Exec
 			persister = fromElement.Queryable;
 
 			idInsertSelect = GenerateIdInsertSelect(persister, bulkTargetAlias, deleteStatement.WhereClause);
-			log.Debug("Generated ID-INSERT-SELECT SQL (multi-table delete) : " + idInsertSelect);
+			log.Debug("Generated ID-INSERT-SELECT SQL (multi-table delete) : {0}", idInsertSelect);
 
 			string[] tableNames = persister.ConstraintOrderedTableNameClosure;
-			string[][] columnNames = persister.ContraintOrderedTableKeyColumnClosure;
+			string[][] columnNames = persister.ConstraintOrderedTableKeyColumnClosure;
 			string idSubselect = GenerateIdSubselect(persister);
 
 			deletes = new SqlString[tableNames.Length];
@@ -51,7 +51,7 @@ namespace NHibernate.Hql.Ast.ANTLR.Exec
 				//          defining all the needed attributes), then we could then get an array of those
 				SqlDeleteBuilder delete = new SqlDeleteBuilder(Factory.Dialect, Factory)
 					.SetTableName(tableNames[i])
-					.SetWhere("(" + StringHelper.Join(", ", columnNames[i]) + ") IN (" + idSubselect + ")");
+					.SetWhere("(" + string.Join(", ", columnNames[i]) + ") IN (" + idSubselect + ")");
 				if (Factory.Settings.IsCommentsEnabled)
 				{
 					delete.SetComment("bulk delete");
@@ -75,17 +75,18 @@ namespace NHibernate.Hql.Ast.ANTLR.Exec
 			try
 			{
 				// First, save off the pertinent ids, saving the number of pertinent ids for return
-				IDbCommand ps = null;
+				DbCommand ps = null;
 				int resultCount;
 				try
 				{
 					try
 					{
 						var paramsSpec = Walker.Parameters;
-						var sqlQueryParametersList = idInsertSelect.GetParameters().ToList();
+						var sqlString = FilterHelper.ExpandDynamicFilterParameters(idInsertSelect, paramsSpec, session);
+						var sqlQueryParametersList = sqlString.GetParameters().ToList();
 						SqlType[] parameterTypes = paramsSpec.GetQueryParameterTypes(sqlQueryParametersList, session.Factory);
 
-						ps = session.Batcher.PrepareCommand(CommandType.Text, idInsertSelect, parameterTypes);
+						ps = session.Batcher.PrepareCommand(CommandType.Text, sqlString, parameterTypes);
 						foreach (var parameterSpecification in paramsSpec)
 						{
 							parameterSpecification.Bind(ps, sqlQueryParametersList, parameters, session);
@@ -113,7 +114,7 @@ namespace NHibernate.Hql.Ast.ANTLR.Exec
 					{
 						try
 						{
-							ps = session.Batcher.PrepareCommand(CommandType.Text, deletes[i], new SqlType[0]);
+							ps = session.Batcher.PrepareCommand(CommandType.Text, deletes[i], Array.Empty<SqlType>());
 							session.Batcher.ExecuteNonQuery(ps);
 						}
 						finally

@@ -199,13 +199,13 @@ namespace NHibernate.SqlCommand
 			: this((IEnumerable<object>)parts)
 		{ }
 
-		private SqlString(IEnumerable<object> parts)
+		internal SqlString(IEnumerable<object> parts)
 		{
 			_parts = new List<Part>();
 			_parameters = new SortedList<int, Parameter>();
 
 			var sqlIndex = 0;
-			var pendingContent = new StringBuilder();  // Collect adjoining string parts (the compaction).
+			var pendingContent = new StringBuilder(); // Collect adjoining string parts (the compaction).
 			foreach (var part in parts)
 			{
 				Add(part, pendingContent, ref sqlIndex);
@@ -347,22 +347,23 @@ namespace NHibernate.SqlCommand
 		{
 			if (string.IsNullOrEmpty(text)) return this;
 			if (_length == 0) return new SqlString(text);
-			return new SqlString(new object[] { this, text });
+			return new SqlString(this, text);
 		}
 
-		/// <summary>
-		/// Compacts the SqlString into the fewest parts possible.
-		/// </summary>
-		/// <returns>A new SqlString.</returns>
-		/// <remarks>
-		/// Combines all SqlParts that are strings and next to each other into
-		/// one SqlPart.
-		/// </remarks>
-		[Obsolete]
-		public SqlString Compact()
+		public SqlString Append(params object[] parts)
 		{
-			// FIXME: As of january 2012, the SqlString is always in compact form. Once this is settled, perhaps we should remove SqlString.Compact()?
-			return this;
+			return _length == 0
+				? new SqlString(parts)
+				: new SqlString(GetAppendParts(parts));
+		}
+
+		private IEnumerable<object> GetAppendParts(object[] parts)
+		{
+			yield return this;
+			foreach (var part in parts)
+			{
+				yield return part;
+			}
 		}
 
 		/// <summary>
@@ -389,7 +390,7 @@ namespace NHibernate.SqlCommand
 		{
 			return value != null
 				&& value.Length <= _length
-				&& IndexOf(value, _length - value.Length, value.Length, StringComparison.CurrentCultureIgnoreCase) >= 0;
+				&& IndexOf(value, _length - value.Length, value.Length, StringComparison.InvariantCultureIgnoreCase) >= 0;
 		}
 
 		public IEnumerable<Parameter> GetParameters()
@@ -417,6 +418,11 @@ namespace NHibernate.SqlCommand
 		public int IndexOfCaseInsensitive(string text)
 		{
 			return IndexOf(text, 0, _length, StringComparison.InvariantCultureIgnoreCase);
+		}
+
+		internal int IndexOfOrdinal(string text)
+		{
+			return IndexOf(text, 0, _length, StringComparison.Ordinal);
 		}
 
 		/// <summary>
@@ -610,6 +616,19 @@ namespace NHibernate.SqlCommand
 		}
 
 		/// <summary>
+		/// Determines whether the sqlString matches the specified System.String,
+		/// using case-insensitive comparison
+		/// </summary>
+		/// <param name="value">The System.String to match</param>
+		/// <returns>true if the SqlString matches the value.</returns>
+		public bool EqualsCaseInsensitive(string value)
+		{
+			return value != null
+				&& value.Length == _length
+				&& IndexOf(value, 0, value.Length, StringComparison.InvariantCultureIgnoreCase) >= 0;
+		}
+
+		/// <summary>
 		/// Retrieves a substring from this instance. The substring starts at a specified character position. 
 		/// </summary>
 		/// <param name="startIndex">The starting character position of a substring in this instance.</param>
@@ -650,6 +669,18 @@ namespace NHibernate.SqlCommand
 		}
 
 		/// <summary>
+		/// Returns true if content is empty or white space characters only
+		/// </summary>
+		public bool IsEmptyOrWhitespace()
+		{
+			if (Length <= 0)
+				return true;
+
+			GetTrimmedIndexes(out _, out var newLength);
+			return newLength <= 0;
+		}
+
+		/// <summary>
 		/// Removes all occurrences of white space characters from the beginning and end of this instance.
 		/// </summary>
 		/// <returns>
@@ -660,6 +691,14 @@ namespace NHibernate.SqlCommand
 		{
 			if (_firstPartIndex < 0) return this;
 
+			GetTrimmedIndexes(out var sqlStartIndex, out var length);
+			return length > 0
+				? new SqlString(this, sqlStartIndex, length)
+				: Empty;
+		}
+
+		private void GetTrimmedIndexes(out int sqlStartIndex, out int length)
+		{
 			var firstPart = _parts[_firstPartIndex];
 			var firstPartOffset = _sqlStartIndex - firstPart.SqlIndex;
 			var firstPartLength = Math.Min(firstPart.Length - firstPartOffset, _length);
@@ -678,11 +717,8 @@ namespace NHibernate.SqlCommand
 				lastPartLength--;
 			}
 
-			var sqlStartIndex = firstPart.SqlIndex + firstPartOffset;
-			var length = lastPart.SqlIndex + lastPartOffset + 1 - sqlStartIndex;
-			return length > 0
-				? new SqlString(this, sqlStartIndex, length)
-				: Empty;
+			sqlStartIndex = firstPart.SqlIndex + firstPartOffset;
+			length = lastPart.SqlIndex + lastPartOffset + 1 - sqlStartIndex;
 		}
 
 		public void Visit(ISqlStringVisitor visitor)

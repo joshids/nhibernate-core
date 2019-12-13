@@ -6,7 +6,7 @@ namespace NHibernate.Hql.Ast.ANTLR.Tree
 {
 	/// <summary>
 	/// A semantic analysis node, that points back to the main analyzer.
-	/// Authoer: josh
+	/// Author: josh
 	/// Ported by: Steve Strong
 	/// </summary>
 	[CLSCompliant(false)]
@@ -29,6 +29,7 @@ namespace NHibernate.Hql.Ast.ANTLR.Tree
 		public HqlSqlWalker Walker
 		{
 			get { return _walker; }
+			protected set { _walker = value; }
 		}
 
 		internal SessionFactoryHelperExtensions SessionFactoryHelper
@@ -36,7 +37,6 @@ namespace NHibernate.Hql.Ast.ANTLR.Tree
 			get { return _walker.SessionFactoryHelper; }
 		}
 
-		
 		public IASTFactory ASTFactory
 		{
 			get { return _walker.ASTFactory; }

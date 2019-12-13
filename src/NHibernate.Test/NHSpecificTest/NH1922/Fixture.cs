@@ -35,11 +35,10 @@ namespace NHibernate.Test.NHSpecificTest.NH1922
             base.OnTearDown();
         }
 
-
         [Test]
         public void CanExecuteQueryOnStatelessSessionUsingDetachedCriteria()
         {
-            using(var stateless = sessions.OpenStatelessSession())
+            using(var stateless = Sfi.OpenStatelessSession())
             {
             	var dc = DetachedCriteria.For<Customer>()
             		.Add(Restrictions.Eq("ValidUntil", new DateTime(2000,1,1)));
@@ -50,7 +49,5 @@ namespace NHibernate.Test.NHSpecificTest.NH1922
 				Assert.IsNotNull(cust);
             }
         }
-
-       
-    }
+	}
 }

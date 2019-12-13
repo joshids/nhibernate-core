@@ -7,7 +7,8 @@ using NUnit.Framework;
 
 namespace NHibernate.Test.NHSpecificTest.NH2583
 {
-    public class MassTestingThreeOrTreesSideBySideFixture : AbstractMassTestingFixture
+	[TestFixture]
+	public class MassTestingThreeOrTreesSideBySideFixture : AbstractMassTestingFixture
     {
         protected void RunTest<T1, T2, T3, T4, T5, T6, T7>(Expression<Func<MyBO, bool>> c1, Expression<Func<MyBO, bool>> c2, SetterTuple<T1, T2, T3, T4, T5, T6, T7> setters)
         {
@@ -101,7 +102,6 @@ namespace NHibernate.Test.NHSpecificTest.NH2583
                     x => x.K1 == 1 || (x.K2 == 1 || (x.BO1.I1 == 1 || x.BO2.J1 == 1)),
                     Setters<TK, TK, TBO1_I, TBO2_J>(MyBO.SetK1, MyBO.SetK2, MyBO.SetBO1_I1, MyBO.SetBO2_J1));
         }
-
 
         [Test]
         public void Test_xyP_in_A_C_D__rsQ_in_A_B_D____xy_IJ_rs_IJ()

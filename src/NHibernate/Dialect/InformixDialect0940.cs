@@ -8,7 +8,6 @@ using NHibernate.Util;
 //using NHibernate.Dialect.Schema;
 using Environment = NHibernate.Cfg.Environment;
 
-
 namespace NHibernate.Dialect
 {
     /// <summary>
@@ -42,7 +41,6 @@ namespace NHibernate.Dialect
             RegisterColumnType(DbType.String, 2147483647, "CLOB");
         }
 
-
         /// <summary> Get the select command used retrieve the names of all sequences.</summary>
         /// <returns> The select command; or null if sequences are not supported. </returns>
         public override string QuerySequencesString
@@ -72,7 +70,7 @@ namespace NHibernate.Dialect
         }
 
         /// <summary> 
-        /// Generate the appropriate select statement to to retreive the next value
+        /// Generate the appropriate select statement to to retrieve the next value
         /// of a sequence.
         /// </summary>
         /// <param name="sequenceName">the name of the sequence </param>
@@ -106,8 +104,7 @@ namespace NHibernate.Dialect
             return "create sequence " + sequenceName;
             // +
             //" INCREMENT BY 1 START WITH 1 MINVALUE 1 NOCYCLE CACHE 20 NOORDER";
-
-        }
+		}
 
         // in .NET overloaded version cannot be overriden (in Java allowed)
         //protected override string GetCreateSequenceString(string sequenceName, int initialValue, int incrementSize)
@@ -146,5 +143,8 @@ namespace NHibernate.Dialect
             get { return false; }
         }
 
+        // Informix 9 is said on Internet to be limited to 128. (http://www.justskins.com/forums/length-of-columns-names-143294.html)
+        /// <inheritdoc />
+        public override int MaxAliasLength => 128;
     };
 }

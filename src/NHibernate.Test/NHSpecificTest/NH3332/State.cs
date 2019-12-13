@@ -8,9 +8,12 @@ namespace NHibernate.Test.NHSpecificTest.NH3332
 	{
 		private ISet<MasterEntity> _masterEntities = new HashSet<MasterEntity>();
 		private ISet<StateDescription> _stateDescriptions = new HashSet<StateDescription>();
+		// Assigned by reflection
+#pragma warning disable CS0649 // Field is never assigned to, and will always have its default value
 		private Int32 _id;
-		private String _name;
 		private Byte[] _rowVersionId;
+#pragma warning restore CS0649 // Field is never assigned to, and will always have its default value
+		private String _name;
 
 		public override int GetHashCode()
 		{
@@ -28,7 +31,6 @@ namespace NHibernate.Test.NHSpecificTest.NH3332
 			var toCompareWith = obj as State;
 			return toCompareWith != null && Id == toCompareWith.Id;
 		}
-
 
 		public virtual Int32 Id
 		{

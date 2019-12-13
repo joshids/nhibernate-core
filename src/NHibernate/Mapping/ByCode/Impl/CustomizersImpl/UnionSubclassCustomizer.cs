@@ -97,6 +97,20 @@ namespace NHibernate.Mapping.ByCode.Impl.CustomizersImpl
 		#endregion
 
 		#region Implementation of IUnionSubclassAttributesMapper<TEntity>
+		public void Extends(System.Type baseType)
+		{
+			CustomizersHolder.AddCustomizer(typeof(TEntity), (IUnionSubclassAttributesMapper m) => m.Extends(baseType));
+		}
+
+		public void Extends(string entityOrClassName)
+		{
+			CustomizersHolder.AddCustomizer(typeof(TEntity), (IUnionSubclassAttributesMapper m) => m.Extends(entityOrClassName));
+		}
+
+		public void Abstract(bool isAbstract)
+		{
+			CustomizersHolder.AddCustomizer(typeof(TEntity), (IUnionSubclassAttributesMapper m) => m.Abstract(isAbstract));
+		}
 
 		public void Table(string tableName)
 		{

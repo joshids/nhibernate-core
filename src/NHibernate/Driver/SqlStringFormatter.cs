@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Text;
 using NHibernate.SqlCommand;
 using NHibernate.Engine.Query;
@@ -15,7 +14,7 @@ namespace NHibernate.Driver
 		private readonly string multipleQueriesSeparator;
 		private bool hasReturnParameter;
 		private bool foundReturnParameter = false;
-		private IList<string> assignedParameterNames = new List<string>();
+		private readonly List<string> assignedParameterNames = new List<string>();
 
 		public SqlStringFormatter(ISqlParameterFormatter formatter, string multipleQueriesSeparator)
 		{
@@ -54,10 +53,10 @@ namespace NHibernate.Driver
 				return;
 			}
 
-			// NH: even if using SqlType[] the final commad may have X parameters, with this line we will use Y parameters in the IDbCommand
+			// NH: even if using SqlType[] the final commad may have X parameters, with this line we will use Y parameters in the DbCommand
 			// for example the ParameterCollection may contains two parameters called @p0 and @p1 but the command contains just @p0.
 			// In this way the same parameter can be used in different places in the query without create a problem to the dear SQL-server (see NH1981)
-			// TODO: find a way to have exactly the same amount of parameters between the final IDbCommand and its IDataParameterCollection
+			// TODO: find a way to have exactly the same amount of parameters between the final DbCommand and its DbParameterCollection
 			// A candidateplace is making DriverBase.SetCommandParameters a little bit more intelligent... perhaps SqlString aware (see also DriverBase.SetCommandText, DriverBase.GenerateCommand)
 			string name = formatter.GetParameterName(parameter.ParameterPosition ?? parameterIndex);
 

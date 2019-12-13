@@ -1,11 +1,10 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using NHibernate.Dialect.Function;
 using NHibernate.Engine;
 using NHibernate.SqlCommand;
 using NHibernate.Type;
-using NHibernate.Util;
 
 namespace NHibernate.Criterion
 {
@@ -16,6 +15,7 @@ namespace NHibernate.Criterion
 		private readonly ISQLFunction function;
 		private readonly string functionName;
 		private readonly IType returnType;
+		private readonly IProjection returnTypeProjection;
 
 		public SqlFunctionProjection(string functionName, IType returnType, params IProjection[] args)
 		{
@@ -28,6 +28,13 @@ namespace NHibernate.Criterion
 		{
 			this.function = function;
 			this.returnType = returnType;
+			this.args = args;
+		}
+
+		public SqlFunctionProjection(string functionName, IProjection returnTypeProjection, params IProjection[] args)
+		{
+			this.functionName = functionName;
+			this.returnTypeProjection = returnTypeProjection;
 			this.args = args;
 		}
 
@@ -51,15 +58,14 @@ namespace NHibernate.Criterion
 			}
 		}
 
-		public override SqlString ToGroupSqlString(ICriteria criteria, ICriteriaQuery criteriaQuery,
-												   IDictionary<string, IFilter> enabledFilters)
+		public override SqlString ToGroupSqlString(ICriteria criteria, ICriteriaQuery criteriaQuery)
 		{
 			SqlStringBuilder buf = new SqlStringBuilder();
 			foreach (IProjection projection in args)
 			{
 				if (projection.IsGrouped)
 				{
-					buf.Add(projection.ToGroupSqlString(criteria, criteriaQuery, enabledFilters)).Add(", ");
+					buf.Add(projection.ToGroupSqlString(criteria, criteriaQuery)).Add(", ");
 				}
 			}
 			if (buf.Count >= 2)
@@ -69,22 +75,21 @@ namespace NHibernate.Criterion
 			return buf.ToSqlString();
 		}
 
-		public override SqlString ToSqlString(ICriteria criteria, int position, ICriteriaQuery criteriaQuery,
-											  IDictionary<string, IFilter> enabledFilters)
+		public override SqlString ToSqlString(ICriteria criteria, int position, ICriteriaQuery criteriaQuery)
 		{
 			ISQLFunction sqlFunction = GetFunction(criteriaQuery);
 
 			var arguments = new List<object>();
 			for (int i = 0; i < args.Length; i++)
 			{
-				SqlString projectArg = GetProjectionArgument(criteriaQuery, criteria, args[i], 0, enabledFilters); // The loc parameter is unused.
+				SqlString projectArg = GetProjectionArgument(criteriaQuery, criteria, args[i], 0); // The loc parameter is unused.
 				arguments.Add(projectArg);
 			}
 
 			return new SqlString(
 				sqlFunction.Render(arguments, criteriaQuery.Factory),
 				" as ",
-				GetColumnAliases(position)[0]);
+				GetColumnAliases(position, criteria, criteriaQuery)[0]);
 		}
 
 		private ISQLFunction GetFunction(ICriteriaQuery criteriaQuery)
@@ -102,19 +107,25 @@ namespace NHibernate.Criterion
 			return dialectFunction;
 		}
 
-		private static SqlString GetProjectionArgument(ICriteriaQuery criteriaQuery, ICriteria criteria,
-													   IProjection projection, int loc,
-													   IDictionary<string, IFilter> enabledFilters)
+		private static SqlString GetProjectionArgument(ICriteriaQuery criteriaQuery, ICriteria criteria, IProjection projection, int loc)
 		{
-			SqlString sql = projection.ToSqlString(criteria, loc, criteriaQuery, enabledFilters);
+			SqlString sql = projection.ToSqlString(criteria, loc, criteriaQuery);
 			return SqlStringHelper.RemoveAsAliasesFromSql(sql);
 		}
 
 		public override IType[] GetTypes(ICriteria criteria, ICriteriaQuery criteriaQuery)
 		{
+			var type = GetReturnType(criteria, criteriaQuery);
+			return type != null ? new[] {type} : Array.Empty<IType>();
+		}
+
+		private IType GetReturnType(ICriteria criteria, ICriteriaQuery criteriaQuery)
+		{
 			ISQLFunction sqlFunction = GetFunction(criteriaQuery);
-			IType type = sqlFunction.ReturnType(returnType, criteriaQuery.Factory);
-			return new IType[] {type};
+
+			var resultType = returnType ?? returnTypeProjection?.GetTypes(criteria, criteriaQuery).FirstOrDefault();
+
+			return sqlFunction.ReturnType(resultType, criteriaQuery.Factory);
 		}
 
 		public override TypedValue[] GetTypedValues(ICriteria criteria, ICriteriaQuery criteriaQuery)

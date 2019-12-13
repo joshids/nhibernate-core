@@ -11,9 +11,9 @@ namespace NHibernate.DomainModel
 		private int _version;
 		private GlarchProxy _next;
 		private short _order;
-		private IList _strings;
+		private IList<string> _strings;
 		private ISet<string> _stringSets;
-		private IList _fooComponents;
+		private IList<FooComponent> _fooComponents;
 		private GlarchProxy[] _proxyArray;
 		private ISet<GlarchProxy> _proxySet;
 
@@ -38,7 +38,6 @@ namespace NHibernate.DomainModel
 			set { this._version = value; }
 		}
 
-
 		/// <summary>
 		/// Gets or sets the _next
 		/// </summary> 
@@ -47,7 +46,6 @@ namespace NHibernate.DomainModel
 			get { return _next; }
 			set { _next = value; }
 		}
-
 
 		/// <summary>
 		/// Gets or sets the _order
@@ -58,16 +56,14 @@ namespace NHibernate.DomainModel
 			set { _order = value; }
 		}
 
-
 		/// <summary>
 		/// Gets or sets the _strings
 		/// </summary> 
-		public IList Strings
+		public IList<string> Strings
 		{
 			get { return _strings; }
 			set { _strings = value; }
 		}
-
 
 		/// <summary>
 		/// Gets or sets the _stringSets
@@ -79,16 +75,14 @@ namespace NHibernate.DomainModel
 			set { _stringSets = value; }
 		}
 
-
 		/// <summary>
 		/// Gets or sets the _fooComponents
 		/// </summary> 
-		public IList FooComponents
+		public IList<FooComponent> FooComponents
 		{
 			get { return _fooComponents; }
 			set { _fooComponents = value; }
 		}
-
 
 		/// <summary>
 		/// Gets or sets the _proxyArray
@@ -98,7 +92,6 @@ namespace NHibernate.DomainModel
 			get { return _proxyArray; }
 			set { _proxyArray = value; }
 		}
-
 
 		/// <summary>
 		/// Gets or sets the _proxySet
@@ -126,7 +119,7 @@ namespace NHibernate.DomainModel
 
 		public LifecycleVeto OnSave(ISession s)
 		{
-			_dynaBean = new Hashtable();
+			_dynaBean = new Dictionary<string, object>();
 			_dynaBean["foo"] = "foo";
 			_dynaBean["bar"] = 66;
 			_immutable = "never changes!";

@@ -10,6 +10,7 @@ using NUnit.Framework;
 
 namespace NHibernate.Test.NHSpecificTest.NH2673
 {
+	[TestFixture]
 	public class CachingWithTransformerTests: TestCaseMappingByCode
 	{
 		protected override HbmMapping GetMappings()
@@ -50,7 +51,6 @@ namespace NHibernate.Test.NHSpecificTest.NH2673
 					blog.Posts.Add(new Post { Title = "First post", Body = "Some text" });
 					blog.Posts.Add(new Post { Title = "Second post", Body = "Some other text" });
 					blog.Posts.Add(new Post { Title = "Third post", Body = "Third post text" });
-
 
 					blog.Comments.Add(new Comment { Title = "First comment", Body = "Some text" });
 					blog.Comments.Add(new Comment { Title = "Second comment", Body = "Some other text" });
@@ -165,7 +165,7 @@ namespace NHibernate.Test.NHSpecificTest.NH2673
 				using (var tx = session.BeginTransaction())
 				{
 					var query = session.CreateCriteria<Blog>()
-					                   .SetFetchMode("Posts", FetchMode.Eager)
+					                   .Fetch("Posts")
 					                   .SetCacheable(true)
 					                   .List<Blog>();
 					tx.Commit();
@@ -182,9 +182,10 @@ namespace NHibernate.Test.NHSpecificTest.NH2673
 				using (var tx = session.BeginTransaction())
 				{
 					var query = session.CreateCriteria<Blog>()
-					                   .SetFetchMode("Posts", FetchMode.Eager)
+					                   .Fetch("Posts")
 					                   .SetCacheable(true)
 					                   .Future<Blog>()
+					                   .GetEnumerable()
 					                   .ToList();
 					tx.Commit();
 				}
@@ -208,9 +209,7 @@ namespace NHibernate.Test.NHSpecificTest.NH2673
 			}
 		}
 
-		
 		[Test(Description = "NH2961/3311")]
-		[Ignore("Not fixed yet.")]
 		public void CanCacheCriteriaWithLeftJoinAndResultTransformer()
 		{
 			Post posts = null;
@@ -227,9 +226,7 @@ namespace NHibernate.Test.NHSpecificTest.NH2673
 			}
 		}
 
-
 		[Test(Description = "NH2961/3311")]
-		[Ignore("Not fixed yet.")]
 		public void CanCacheCriteriaWithEagerLoadAndResultTransformer()
 		{
 			using (new Scenario(Sfi))
@@ -237,14 +234,13 @@ namespace NHibernate.Test.NHSpecificTest.NH2673
 			using (session.BeginTransaction())
 			{
 				var result = session.QueryOver<Blog>().Where(x => x.Author == "Gabriel")
-									.Fetch(x => x.Posts).Eager
+									.Fetch(SelectMode.Fetch, x => x.Posts)
 									.TransformUsing(new DistinctRootEntityResultTransformer())
 									.Cacheable()
 									.List<Blog>();
 			}
 		}
 
-		
 		[Test(Description = "NH2961/3311")]
 		public void CanCacheCriteriaWithLeftJoin()
 		{

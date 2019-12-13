@@ -10,7 +10,7 @@ namespace NHibernate.Test.Hql.Ast
 		{
 			const string query = "select 123.5, s from SimpleClass s";
 
-			Assert.That(GetSql(query), Is.StringStarting("select 123.5"));
+			Assert.That(GetSql(query), Does.StartWith("select 123.5"));
 		}
 
 		[Test]
@@ -20,6 +20,16 @@ namespace NHibernate.Test.Hql.Ast
 			Assert.DoesNotThrow(() => GetSql(query));
 
 			const string queryWithoutParen = "from SimpleClass s where (case when s.IntValue > 0 then cast(s.IntValue as long) * :pAValue else 1 end) > 0";
+			Assert.DoesNotThrow(() => GetSql(queryWithoutParen));
+		}
+
+		[Test]
+		public void SimpleCaseClauseWithMath()
+		{
+			const string query = "from SimpleClass s where (case (cast(s.IntValue as long) * :pAValue) when (cast(s.IntValue as long) * :pAValue) then (cast(s.IntValue as long) * :pAValue) else 1 end) > 0";
+			Assert.DoesNotThrow(() => GetSql(query));
+
+			const string queryWithoutParen = "from SimpleClass s where (case cast(s.IntValue as long) * :pAValue when cast(s.IntValue as long) * :pAValue then cast(s.IntValue as long) * :pAValue else 1 end) > 0";
 			Assert.DoesNotThrow(() => GetSql(queryWithoutParen));
 		}
 

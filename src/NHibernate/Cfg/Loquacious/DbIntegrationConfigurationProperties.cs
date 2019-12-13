@@ -3,11 +3,15 @@ using NHibernate.AdoNet;
 using NHibernate.Connection;
 using NHibernate.Driver;
 using NHibernate.Exceptions;
+using NHibernate.Linq.Visitors;
 using NHibernate.Transaction;
 
 namespace NHibernate.Cfg.Loquacious
 {
-	internal class DbIntegrationConfigurationProperties: IDbIntegrationConfigurationProperties
+	public class DbIntegrationConfigurationProperties
+#pragma warning disable 618
+		: IDbIntegrationConfigurationProperties
+#pragma warning restore 618
 	{
 		private readonly Configuration configuration;
 
@@ -93,6 +97,9 @@ namespace NHibernate.Cfg.Loquacious
 			set { configuration.SetProperty(Environment.PrepareSql, value.ToString().ToLowerInvariant()); }
 		}
 
+		/// <summary>
+		/// Set the default timeout in seconds for ADO.NET queries.
+		/// </summary>
 		public byte Timeout
 		{
 			set { configuration.SetProperty(Environment.CommandTimeout, value.ToString()); }
@@ -121,6 +128,11 @@ namespace NHibernate.Cfg.Loquacious
 		public SchemaAutoAction SchemaAction
 		{
 			set { configuration.SetProperty(Environment.Hbm2ddlAuto, value.ToString()); }
+		}
+
+		public void QueryModelRewriterFactory<TFactory>() where TFactory : IQueryModelRewriterFactory
+		{
+			configuration.SetProperty(Environment.QueryModelRewriterFactory, typeof(TFactory).AssemblyQualifiedName);
 		}
 
 		#endregion

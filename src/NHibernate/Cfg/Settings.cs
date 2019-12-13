@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Data;
 using NHibernate.AdoNet;
@@ -7,6 +8,7 @@ using NHibernate.Connection;
 using NHibernate.Exceptions;
 using NHibernate.Hql;
 using NHibernate.Linq.Functions;
+using NHibernate.Linq.Visitors;
 using NHibernate.Transaction;
 
 namespace NHibernate.Cfg
@@ -27,7 +29,6 @@ namespace NHibernate.Cfg
 		#region JDBC Specific (Not Ported)
 
 		//private int jdbcFetchSize;
-		//private bool isJdbcBatchVersionedData;
 
 		#endregion
 		public SqlStatementLogger SqlStatementLogger { get; internal set; }
@@ -51,6 +52,15 @@ namespace NHibernate.Cfg
 		public string DefaultCatalogName { get; internal set; }
 
 		public string SessionFactoryName { get; internal set; }
+
+		/// <summary>
+		/// Should sessions check on every operation whether there is an ongoing system transaction or not, and enlist
+		/// into it if any? Default is <see langword="true"/>. It can also be controlled at session opening, see
+		/// <see cref="ISessionFactory.WithOptions" />. A session can also be instructed to explicitly join the current
+		/// transaction by calling <see cref="ISession.JoinTransaction" />. This setting has no effect if using a
+		/// transaction factory that is not system transactions aware.
+		/// </summary>
+		public bool AutoJoinTransaction { get; internal set; }
 
 		public bool IsAutoCreateSchema { get; internal set; }
 
@@ -80,6 +90,8 @@ namespace NHibernate.Cfg
 
 		public bool IsIdentifierRollbackEnabled { get; internal set; }
 
+		// Since v5
+		[Obsolete("Please use DefaultFlushMode instead.")]
 		public bool IsFlushBeforeCompletionEnabled { get; internal set; }
 
 		public bool IsAutoCloseSessionEnabled { get; internal set; }
@@ -98,6 +110,8 @@ namespace NHibernate.Cfg
 
 		public IQueryTranslatorFactory QueryTranslatorFactory { get; internal set; }
 
+		public System.Type LinqQueryProviderType { get; internal set; }
+
 		public ISQLExceptionConverter SqlExceptionConverter { get; internal set; }
 
 		public bool IsWrapResultSetsEnabled { get; internal set; }
@@ -106,7 +120,7 @@ namespace NHibernate.Cfg
 
 		public bool IsOrderInsertsEnabled { get; internal set; }
 
-		public EntityMode DefaultEntityMode { get; internal set; }
+		public FlushMode DefaultFlushMode { get; internal set; }
 
 		public bool IsDataDefinitionImplicitCommit { get; internal set; }
 
@@ -114,17 +128,31 @@ namespace NHibernate.Cfg
 
 		public bool IsNamedQueryStartupCheckingEnabled { get; internal set; }
 
+		public bool IsBatchVersionedDataEnabled { get; internal set; }
+
 		#region NH specific
 
 		public IsolationLevel IsolationLevel { get; internal set; }
 
 		public bool IsOuterJoinFetchEnabled { get; internal set; }
+		
+		public bool TrackSessionId { get; internal set; }
 
 		/// <summary>
 		/// Get the registry to provide Hql-Generators for known properties/methods.
 		/// </summary>
 		public ILinqToHqlGeneratorsRegistry LinqToHqlGeneratorsRegistry { get; internal set; }
 
+		public IQueryModelRewriterFactory QueryModelRewriterFactory { get; internal set; }
+		
 		#endregion
+
+		internal string GetFullCacheRegionName(string name)
+		{
+			var prefix = CacheRegionPrefix;
+			if (!string.IsNullOrEmpty(prefix))
+				return prefix + '.' + name;
+			return name;
+		}
 	}
 }

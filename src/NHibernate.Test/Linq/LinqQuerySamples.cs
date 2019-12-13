@@ -9,6 +9,22 @@ namespace NHibernate.Test.Linq
 	[TestFixture]
 	public class LinqQuerySamples : LinqTestCase
 	{
+		[Test]
+		public void GroupTwoQueriesAndSum()
+		{
+			//NH-3534
+			var queryWithAggregation = from o1 in db.Orders
+									   from o2 in db.Orders
+									   where o1.Customer.CustomerId == o2.Customer.CustomerId && o1.OrderDate == o2.OrderDate
+									   group o1 by new { o1.Customer.CustomerId, o1.OrderDate } into g
+									   select new { CustomerId = g.Key.CustomerId, LastOrderDate = g.Max(x => x.OrderDate) };
+
+			var result = queryWithAggregation.ToList();
+
+			Assert.IsNotNull(result);
+			Assert.IsNotEmpty(result);
+		}
+
 		[Category("WHERE")]
 		[Test(Description = "This sample uses WHERE to filter for Customers in London.")]
 		public void DLinq1()
@@ -204,6 +220,9 @@ namespace NHibernate.Test.Linq
 							"a shaped subset of the data about Customers.")]
 		public void DLinq16()
 		{
+			if (!Dialect.SupportsScalarSubSelects)
+				Assert.Ignore(Dialect.GetType().Name + " does not support scalar sub-queries");
+
 			var q =
 				from c in db.Customers
 				select new
@@ -265,12 +284,12 @@ namespace NHibernate.Test.Linq
 				//q2.ToList();
 
 				///////////
-				/// Batching Select
+				///// Batching Select
 				///////////
 				var dbOrders3 = s.CreateQuery("select o.OrderId from Order o").List<int>();
 
 				//var q3 = dbOrders3.SubQueryBatcher(orderId => orderId,
-				//                                   ids => from subO in db.Orders.ToList()  // Note that ToList is just because current group by code is incorrent in our linq provider
+				//                                   ids => from subO in db.Orders.ToList() // Note that ToList is just because current group by code is incorrent in our linq provider
 				//                                          where ids.Contains(subO.OrderId)
 				//                                          from orderLine in subO.OrderLines
 				//                                          group new {orderLine, FreeShippingDiscount = subO.Freight}
@@ -312,7 +331,6 @@ namespace NHibernate.Test.Linq
 									   OrderId = input.Item,
 									   DiscountedProducts = input.Batcher.GetData(index)
 								   });
-
 
 				foreach (var x in q3)
 				{
@@ -720,7 +738,6 @@ namespace NHibernate.Test.Linq
 
 			ObjectDumper.Write(q);
 		}
-
 
 		[Category("ORDER BY")]
 		[Test(Description = "This sample uses Orderby, Max and Group By to find the Products that have " +
@@ -1437,6 +1454,9 @@ namespace NHibernate.Test.Linq
 		[Test(Description = "This sample explictly joins two tables and projects results from both tables using a group join.")]
 		public void DLinqJoin5()
 		{
+			if (!Dialect.SupportsScalarSubSelects)
+				Assert.Ignore(Dialect.GetType().Name + " does not support scalar sub-queries");
+
 			var q =
 				from c in db.Customers 
 				join o in db.Orders on c.CustomerId equals o.Customer.CustomerId into orders
@@ -1483,9 +1503,24 @@ namespace NHibernate.Test.Linq
 		}
 
 		[Category("JOIN")]
+		[Test(Description = "This sample explictly joins two tables with a composite key and projects results from both tables.")]
+		public void DLinqJoin5d()
+		{
+			var q =
+				from c in db.Customers
+				join o in db.Orders on new {c.CustomerId, HasContractTitle = c.ContactTitle != null} equals new {o.Customer.CustomerId, HasContractTitle = o.Customer.ContactTitle != null }
+				select new { c.ContactName, o.OrderId };
+
+			ObjectDumper.Write(q);
+		}
+
+		[Category("JOIN")]
 		[Test(Description = "This sample explictly joins three tables and projects results from each of them.")]
 		public void DLinqJoin6()
 		{
+			if (!Dialect.SupportsScalarSubSelects)
+				Assert.Ignore(Dialect.GetType().Name + " does not support scalar sub-queries");
+
 			var q =
 				from c in db.Customers
 				join o in db.Orders on c.CustomerId equals o.Customer.CustomerId into ords
@@ -1590,7 +1625,6 @@ namespace NHibernate.Test.Linq
 				(from o in db.Orders
 				 where o.ShippingDate != null
 				 select o.OrderId).ToArray();
-
 
 			var withNullShippingDate =
 				new[]

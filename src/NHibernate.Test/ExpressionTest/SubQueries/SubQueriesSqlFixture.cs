@@ -16,7 +16,7 @@ namespace NHibernate.Test.ExpressionTest.SubQueries
 			get { return "NHibernate.Test"; }
 		}
 
-		protected override IList Mappings
+		protected override string[] Mappings
 		{
 			get { return new string[] {"ExpressionTest.SubQueries.Mappings.hbm.xml"}; }
 		}
@@ -45,7 +45,6 @@ namespace NHibernate.Test.ExpressionTest.SubQueries
 				comment.IndexInPost = 0;
 				post1.Comments.Add(comment);
 
-
 				session.Save(category);
 				session.Save(author);
 				session.Save(commenter);
@@ -59,7 +58,7 @@ namespace NHibernate.Test.ExpressionTest.SubQueries
 
 		protected override void OnTearDown()
 		{
-			using (ISession s = sessions.OpenSession())
+			using (ISession s = Sfi.OpenSession())
 			{
 				s.Delete("from Comment");
 				s.Delete("from Post");
@@ -78,7 +77,7 @@ namespace NHibernate.Test.ExpressionTest.SubQueries
 				.Add(Expression.Eq("id", post1.PostId))
 				.Add(Property.ForName("posts.Blog.id").EqProperty("blog.id"));
 
-			using (ISession s = sessions.OpenSession())
+			using (ISession s = Sfi.OpenSession())
 			{
 				IList list = s.CreateCriteria(typeof(Blog), "blog")
 					.Add(Subqueries.Exists(dc))

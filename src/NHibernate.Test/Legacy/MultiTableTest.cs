@@ -5,6 +5,8 @@ using NHibernate.Dialect;
 using NHibernate.DomainModel;
 using NUnit.Framework;
 
+using MultiEntity = NHibernate.DomainModel.Multi;
+
 namespace NHibernate.Test.Legacy
 {
 	/// <summary>
@@ -13,7 +15,7 @@ namespace NHibernate.Test.Legacy
 	[TestFixture]
 	public class MultiTableTest : TestCase
 	{
-		protected override IList Mappings
+		protected override string[] Mappings
 		{
 			get { return new string[] {"Multi.hbm.xml", "MultiExtends.hbm.xml"}; }
 		}
@@ -22,11 +24,10 @@ namespace NHibernate.Test.Legacy
 		public void FetchManyToOne()
 		{
 			ISession s = OpenSession();
-			s.CreateCriteria(typeof(Po)).SetFetchMode("Set", FetchMode.Eager).List();
-			s.CreateCriteria(typeof(Po)).SetFetchMode("List", FetchMode.Eager).List();
+			s.CreateCriteria(typeof(Po)).Fetch("Set").List();
+			s.CreateCriteria(typeof(Po)).Fetch("List").List();
 			s.Close();
 		}
-
 
 		[Test]
 		public void Joins()
@@ -49,7 +50,6 @@ namespace NHibernate.Test.Legacy
 			s.Close();
 		}
 
-
 		[Test]
 		public void JoinOpenBug()
 		{
@@ -68,15 +68,9 @@ namespace NHibernate.Test.Legacy
 			SubMulti sm = new SubMulti();
 			SubMulti sm1 = new SubMulti();
 			SubMulti sm2 = new SubMulti();
-			IList list = new ArrayList();
-			IList anotherList = new ArrayList();
-			sm.Children = list;
-			sm.MoreChildren = anotherList;
+			sm.Children = new List<SubMulti> {sm1, sm2};
+			sm.MoreChildren = new List<SubMulti> {sm1, sm2};
 			sm.ExtraProp = "foo";
-			list.Add(sm1);
-			list.Add(sm2);
-			anotherList.Add(sm1);
-			anotherList.Add(sm2);
 			sm1.Parent = sm;
 			sm2.Parent = sm;
 			object id = s.Save(sm);
@@ -85,7 +79,7 @@ namespace NHibernate.Test.Legacy
 			s.Flush();
 			s.Close();
 
-			sessions.Evict(typeof(SubMulti));
+			Sfi.Evict(typeof(SubMulti));
 
 			s = OpenSession();
 			// TODO: I don't understand why h2.0.3/h2.1 issues a select statement here
@@ -155,7 +149,7 @@ namespace NHibernate.Test.Legacy
 			ISession s = OpenSession();
 			long id = 1L;
 
-			if (Dialect is MsSql2000Dialect)
+			if (TestDialect.HasIdentityNativeGenerator)
 			{
 				id = (long) s.Save(new TrivialClass());
 			}
@@ -191,7 +185,7 @@ namespace NHibernate.Test.Legacy
 			ITransaction t = s.BeginTransaction();
 			SubMulti sm = new SubMulti();
 			sm.Amount = 66.5f;
-			if (Dialect is MsSql2000Dialect)
+			if (TestDialect.HasIdentityNativeGenerator)
 			{
 				s.Save(sm);
 			}
@@ -214,7 +208,7 @@ namespace NHibernate.Test.Legacy
 		{
 			ISession s = OpenSession();
 			ITransaction t = s.BeginTransaction();
-			Multi multi = new Multi();
+			MultiEntity multi = new MultiEntity();
 			multi.ExtraProp = "extra";
 			multi.Name = "name";
 			Top simp = new Top();
@@ -222,7 +216,7 @@ namespace NHibernate.Test.Legacy
 			simp.Name = "simp";
 			object mid;
 			object sid;
-			if (Dialect is MsSql2000Dialect)
+			if (TestDialect.HasIdentityNativeGenerator)
 			{
 				mid = s.Save(multi);
 				sid = s.Save(simp);
@@ -237,7 +231,7 @@ namespace NHibernate.Test.Legacy
 			SubMulti sm = new SubMulti();
 			sm.Amount = 66.5f;
 			object smid;
-			if (Dialect is MsSql2000Dialect)
+			if (TestDialect.HasIdentityNativeGenerator)
 			{
 				smid = s.Save(sm);
 			}
@@ -263,7 +257,7 @@ namespace NHibernate.Test.Legacy
 
 			s = OpenSession();
 			t = s.BeginTransaction();
-			multi = (Multi) s.Load(typeof(Multi), mid);
+			multi = (MultiEntity) s.Load(typeof(MultiEntity), mid);
 			Assert.AreEqual("extra2", multi.ExtraProp);
 			multi.ExtraProp = multi.ExtraProp + "3";
 			Assert.AreEqual("new name", multi.Name);
@@ -276,9 +270,9 @@ namespace NHibernate.Test.Legacy
 
 			s = OpenSession();
 			t = s.BeginTransaction();
-			multi = (Multi) s.Load(typeof(Top), mid);
+			multi = (MultiEntity) s.Load(typeof(Top), mid);
 			simp = (Top) s.Load(typeof(Top), sid);
-			Assert.IsFalse(simp is Multi);
+			Assert.IsFalse(simp is MultiEntity);
 			Assert.AreEqual("extra23", multi.ExtraProp);
 			Assert.AreEqual("newer name", multi.Name);
 			t.Commit();
@@ -293,8 +287,8 @@ namespace NHibernate.Test.Legacy
 			while (enumer.MoveNext())
 			{
 				object o = enumer.Current;
-				if ((o is Top) && !(o is Multi)) foundSimp = true;
-				if ((o is Multi) && !(o is SubMulti)) foundMulti = true;
+				if ((o is Top) && !(o is MultiEntity)) foundSimp = true;
+				if ((o is MultiEntity) && !(o is SubMulti)) foundMulti = true;
 				if (o is SubMulti) foundSubMulti = true;
 			}
 			Assert.IsTrue(foundSimp);
@@ -329,7 +323,7 @@ namespace NHibernate.Test.Legacy
 			s = OpenSession();
 			t = s.BeginTransaction();
 			if (TestDialect.SupportsSelectForUpdateOnOuterJoin)
-				multi = (Multi)s.Load(typeof(Top), mid, LockMode.Upgrade);
+				multi = (MultiEntity)s.Load(typeof(Top), mid, LockMode.Upgrade);
 			simp = (Top) s.Load(typeof(Top), sid);
 			s.Lock(simp, LockMode.UpgradeNoWait);
 			t.Commit();
@@ -349,7 +343,7 @@ namespace NHibernate.Test.Legacy
 		{
 			ISession s = OpenSession();
 			ITransaction t = s.BeginTransaction();
-			Multi multi = new Multi();
+			MultiEntity multi = new MultiEntity();
 			multi.ExtraProp = "extra";
 			multi.Name = "name";
 			Top simp = new Top();
@@ -377,7 +371,7 @@ namespace NHibernate.Test.Legacy
 
 			s = OpenSession();
 			t = s.BeginTransaction();
-			multi = (Multi) s.Load(typeof(Multi), multiId);
+			multi = (MultiEntity) s.Load(typeof(MultiEntity), multiId);
 			Assert.AreEqual("extra2", multi.ExtraProp);
 			multi.ExtraProp += "3";
 			Assert.AreEqual("new name", multi.Name);
@@ -390,11 +384,9 @@ namespace NHibernate.Test.Legacy
 
 			s = OpenSession();
 			t = s.BeginTransaction();
-			multi = (Multi) s.Load(typeof(Top), multiId);
+			multi = (MultiEntity) s.Load(typeof(Top), multiId);
 			simp = (Top) s.Load(typeof(Top), simpId);
-			Assert.IsFalse(simp is Multi);
-			// Can't see the point of this test since the variable is declared as Multi!
-			//Assert.IsTrue( multi is Multi );
+			Assert.IsFalse(simp is MultiEntity);
 			Assert.AreEqual("extra23", multi.ExtraProp);
 			Assert.AreEqual("newer name", multi.Name);
 			t.Commit();
@@ -409,8 +401,8 @@ namespace NHibernate.Test.Legacy
 
 			foreach (object obj in enumer)
 			{
-				if ((obj is Top) && !(obj is Multi)) foundSimp = true;
-				if ((obj is Multi) && !(obj is SubMulti)) foundMulti = true;
+				if ((obj is Top) && !(obj is MultiEntity)) foundSimp = true;
+				if ((obj is MultiEntity) && !(obj is SubMulti)) foundMulti = true;
 				if (obj is SubMulti) foundSubMulti = true;
 			}
 			Assert.IsTrue(foundSimp);
@@ -437,7 +429,7 @@ namespace NHibernate.Test.Legacy
 			s = OpenSession();
 			t = s.BeginTransaction();
 			if (TestDialect.SupportsSelectForUpdateOnOuterJoin)
-				multi = (Multi) s.Load(typeof(Top), multiId, LockMode.Upgrade);
+				multi = (MultiEntity) s.Load(typeof(Top), multiId, LockMode.Upgrade);
 			simp = (Top) s.Load(typeof(Top), simpId);
 			s.Lock(simp, LockMode.UpgradeNoWait);
 			t.Commit();
@@ -463,7 +455,7 @@ namespace NHibernate.Test.Legacy
 			ISession s = OpenSession();
 			ITransaction t = s.BeginTransaction();
 			Assert.AreEqual(0, s.CreateQuery("from s in class Top").List().Count);
-			Multi multi = new Multi();
+			MultiEntity multi = new MultiEntity();
 			multi.ExtraProp = "extra";
 			multi.Name = "name";
 			Top simp = new Top();
@@ -471,7 +463,7 @@ namespace NHibernate.Test.Legacy
 			simp.Name = "simp";
 			object mid;
 			object sid;
-			if (Dialect is MsSql2000Dialect)
+			if (TestDialect.HasIdentityNativeGenerator)
 			{
 				mid = s.Save(multi);
 				sid = s.Save(simp);
@@ -491,7 +483,7 @@ namespace NHibernate.Test.Legacy
 			ls.Set = new HashSet<Top> { multi, simp };
 
 			object id;
-			if (Dialect is MsSql2000Dialect)
+			if (TestDialect.HasIdentityNativeGenerator)
 			{
 				id = s.Save(ls);
 			}
@@ -520,7 +512,7 @@ namespace NHibernate.Test.Legacy
 			foreach (object obj in ls.Set)
 			{
 				if (obj is Top) foundSimple++;
-				if (obj is Multi) foundMulti++;
+				if (obj is MultiEntity) foundMulti++;
 			}
 			Assert.AreEqual(2, foundSimple);
 			Assert.AreEqual(1, foundMulti);
@@ -540,7 +532,7 @@ namespace NHibernate.Test.Legacy
 			ISession s = OpenSession();
 			ITransaction t = s.BeginTransaction();
 			Assert.AreEqual(0, s.CreateQuery("from s in class Top").List().Count);
-			Multi multi = new Multi();
+			MultiEntity multi = new MultiEntity();
 			multi.ExtraProp = "extra";
 			multi.Name = "name";
 			Top simp = new Top();
@@ -548,7 +540,7 @@ namespace NHibernate.Test.Legacy
 			simp.Name = "simp";
 			object mid;
 
-			if (Dialect is MsSql2000Dialect)
+			if (TestDialect.HasIdentityNativeGenerator)
 			{
 				mid = s.Save(multi);
 			}
@@ -563,7 +555,7 @@ namespace NHibernate.Test.Legacy
 			ls.YetAnother = ls;
 			ls.Name = "Less Simple";
 			object id;
-			if (Dialect is MsSql2000Dialect)
+			if (TestDialect.HasIdentityNativeGenerator)
 			{
 				id = s.Save(ls);
 			}
@@ -585,7 +577,7 @@ namespace NHibernate.Test.Legacy
 			Assert.AreSame(ls, ls.Other);
 			Assert.AreSame(ls, ls.YetAnother);
 			Assert.AreEqual("name", ls.Another.Name);
-			Assert.IsTrue(ls.Another is Multi);
+			Assert.IsTrue(ls.Another is MultiEntity);
 			s.Delete(ls);
 			s.Delete(ls.Another);
 			t.Commit();
@@ -597,7 +589,7 @@ namespace NHibernate.Test.Legacy
 		{
 			ISession s = OpenSession();
 			ITransaction t = s.BeginTransaction();
-			Multi multi = new Multi();
+			MultiEntity multi = new MultiEntity();
 			multi.ExtraProp = "extra";
 			object id = s.Save(multi);
 			Assert.IsNotNull(id);
@@ -609,18 +601,20 @@ namespace NHibernate.Test.Legacy
 		[Test]
 		public void Collection()
 		{
+			if (!TestDialect.SupportsEmptyInsertsOrHasNonIdentityNativeGenerator)
+				Assert.Ignore("Support of empty inserts is required");
+
 			ISession s = OpenSession();
 			ITransaction t = s.BeginTransaction();
-			Multi multi1 = new Multi();
+			MultiEntity multi1 = new MultiEntity();
 			multi1.ExtraProp = "extra1";
-			Multi multi2 = new Multi();
+			MultiEntity multi2 = new MultiEntity();
 			multi2.ExtraProp = "extra2";
 			Po po = new Po();
 			multi1.Po = po;
 			multi2.Po = po;
-			po.Set = new HashSet<Multi> {multi1, multi2};
-			po.List = new ArrayList();
-			po.List.Add(new SubMulti());
+			po.Set = new HashSet<MultiEntity> {multi1, multi2};
+			po.List = new List<SubMulti> {new SubMulti()};
 			object id = s.Save(po);
 			Assert.IsNotNull(id);
 			t.Commit();
@@ -661,7 +655,7 @@ namespace NHibernate.Test.Legacy
 		{
 			ISession s = OpenSession();
 			Lower ls = new Lower();
-			IList list = new ArrayList();
+			IList<Top> list = new List<Top>();
 			ls.Bag = list;
 			Top simple = new Top();
 			object id = s.Save(ls);

@@ -1,13 +1,16 @@
 using System;
 using System.Collections;
 using System.IO;
+using System.Linq;
 using System.Xml;
 using NHibernate.Cfg;
 using NHibernate.DomainModel;
+using NHibernate.Engine;
+using NHibernate.Linq;
 using NHibernate.Tool.hbm2ddl;
 using NHibernate.Util;
 using NUnit.Framework;
-using Environment=NHibernate.Cfg.Environment;
+using Environment = NHibernate.Cfg.Environment;
 
 namespace NHibernate.Test.CfgTest
 {
@@ -25,7 +28,7 @@ namespace NHibernate.Test.CfgTest
 		public void ReadCfgXmlFromDefaultFile()
 		{
 			Configuration cfg = new Configuration();
-			cfg.Configure("TestEnbeddedConfig.cfg.xml");
+			cfg.Configure(Path.Combine(TestContext.CurrentContext.TestDirectory, "TestEmbeddedConfig.cfg.xml"));
 
 			Assert.IsTrue(cfg.Properties.ContainsKey(Environment.ShowSql));
 			Assert.IsTrue(cfg.Properties.ContainsKey(Environment.UseQueryCache));
@@ -38,7 +41,7 @@ namespace NHibernate.Test.CfgTest
 		}
 
 		/// <summary>
-		/// Recieved sample code that Configuration could not be configured manually.  It can be configured
+		/// Received sample code that Configuration could not be configured manually.  It can be configured
 		/// manually just need to set all of the properties before adding classes
 		/// </summary>
 		[Test, Explicit]
@@ -74,7 +77,7 @@ namespace NHibernate.Test.CfgTest
 		public void ReadCfgXmlFromAssembly()
 		{
 			Configuration cfg = new Configuration();
-			cfg.Configure(this.GetType().Assembly, "NHibernate.Test.TestEnbeddedConfig.cfg.xml");
+			cfg.Configure(this.GetType().Assembly, "NHibernate.Test.TestEmbeddedConfig.cfg.xml");
 
 			Assert.AreEqual("true 1, false 0, yes 1, no 0", cfg.Properties[Environment.QuerySubstitutions]);
 			Assert.AreEqual("Server=localhost;initial catalog=nhibernate;User Id=;Password=",
@@ -89,7 +92,7 @@ namespace NHibernate.Test.CfgTest
 		public void InvalidXmlInCfgFile()
 		{
 			XmlDocument cfgXml = new XmlDocument();
-			cfgXml.Load("TestEnbeddedConfig.cfg.xml");
+			cfgXml.Load(Path.Combine(TestContext.CurrentContext.TestDirectory, "TestEmbeddedConfig.cfg.xml"));
 
 			// this should put us at the first <property> element
 			XmlElement propElement = cfgXml.DocumentElement.GetElementsByTagName("property")[0] as XmlElement;
@@ -97,8 +100,8 @@ namespace NHibernate.Test.CfgTest
 			// removing this will cause it not to validate
 			propElement.RemoveAttribute("name");
 
-			const string FileNameForInvalidCfg = "hibernate.invalid.cfg.xml";
-      cfgXml.Save(FileNameForInvalidCfg);
+			string FileNameForInvalidCfg = Path.Combine(TestContext.CurrentContext.TestDirectory, "hibernate.invalid.cfg.xml");
+			cfgXml.Save(FileNameForInvalidCfg);
 
 			Configuration cfg = new Configuration();
 			try
@@ -220,7 +223,7 @@ namespace NHibernate.Test.CfgTest
 		[Test]
 		public void InvalidXmlInHbmFile()
 		{
-			string filename = "invalid.hbm.xml";
+			string filename = Path.Combine(TestContext.CurrentContext.TestDirectory, "invalid.hbm.xml");
 			// it's missing the class name - won't validate
 			string hbm =
 				@"<?xml version='1.0' encoding='utf-8' ?> 
@@ -416,6 +419,65 @@ namespace NHibernate.Test.CfgTest
 			XmlTextReader xtr = new XmlTextReader(xml, XmlNodeType.Document, null);
 			cfg.Configure(xtr);
 			// No exception expected
+		}
+
+		public class SampleQueryProvider : DefaultQueryProvider
+		{
+			public SampleQueryProvider(ISessionImplementor session) : base(session)
+			{
+			}
+
+			protected SampleQueryProvider(ISessionImplementor session, object collection,  NhQueryableOptions options) : base(session, collection, options)
+			{
+			}
+
+			protected override IQueryProvider CreateWithOptions(NhQueryableOptions options)
+			{
+				return new SampleQueryProvider(Session, Collection, options);
+			}
+		}
+
+		[Test]
+		public void NH2890Standard()
+		{
+			var cfg = new Configuration();
+			cfg.Configure(Path.Combine(TestContext.CurrentContext.TestDirectory, "TestEmbeddedConfig.cfg.xml"))
+				.LinqQueryProvider<SampleQueryProvider>()
+				.SetDefaultAssembly("NHibernate.DomainModel")
+				.SetDefaultNamespace("NHibernate.DomainModel");
+
+			using (var sessionFactory = cfg.BuildSessionFactory())
+			{
+				using (var session = sessionFactory.OpenSession())
+				{
+					var query = session.Query<NHibernate.DomainModel.A>();
+					Assert.IsInstanceOf(typeof(SampleQueryProvider), query.Provider);
+				}
+
+				using (var session = sessionFactory.OpenSession())
+				{
+					var query = session.Query<NHibernate.DomainModel.A>().WithOptions(x => x.SetReadOnly(true));
+					Assert.IsInstanceOf(typeof(SampleQueryProvider), query.Provider);
+				}
+			}
+		}
+
+		[Test]
+		public void NH2890Xml()
+		{
+			var cfg = new Configuration();
+			cfg.Configure(Path.Combine(TestContext.CurrentContext.TestDirectory, "TestEmbeddedConfig.cfg.xml"))
+				.SetDefaultAssembly("NHibernate.DomainModel")
+				.SetDefaultNamespace("NHibernate.DomainModel");
+
+			using (var sessionFactory = cfg.BuildSessionFactory())
+			{
+				using (var session = sessionFactory.OpenSession())
+				{
+					var query = session.Query<NHibernate.DomainModel.A>();
+					Assert.IsInstanceOf(typeof(SampleQueryProvider), query.Provider);
+				}
+			}
 		}
 	}
 }

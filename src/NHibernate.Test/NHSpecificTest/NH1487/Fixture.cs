@@ -1,9 +1,9 @@
+using System;
 using System.Text;
 using NHibernate.Cfg;
 using NHibernate.Dialect;
 using NHibernate.Tool.hbm2ddl;
 using NUnit.Framework;
-using System;
 
 namespace NHibernate.Test.NHSpecificTest.NH1487
 {
@@ -22,7 +22,6 @@ namespace NHibernate.Test.NHSpecificTest.NH1487
 	[TestFixture]
 	public class Fixture
 	{
-
 		public Configuration GetConf()
 		{
 			var cfg = new Configuration();
@@ -34,7 +33,8 @@ namespace NHibernate.Test.NHSpecificTest.NH1487
 		[Test]
 		public void GenerateSchemaMultipleUniqueKeys()
 		{
-			if(!(Dialect.Dialect.GetDialect() is MsSql2000Dialect))
+			var cfg = GetConf();
+			if(!(Dialect.Dialect.GetDialect(cfg.Properties) is MsSql2000Dialect))
 			{
 				Assert.Ignore("Specific for MsSql2000Dialect");
 			}
@@ -52,17 +52,15 @@ assembly='NHibernate.Test'>
     </class>
 </hibernate-mapping>";
 
-			var cfg = GetConf();
-
 			cfg.AddXmlString(hbm);
 
 			// Can create the schema
 			var scriptB = new StringBuilder();
 			new SchemaExport(cfg).Create(sl => scriptB.Append(sl), true);
 			var script = scriptB.ToString();
-			Assert.That(script, Is.StringContaining("unique (A, C)"));
-			Assert.That(script, Is.StringContaining("unique (B, C)"));
-			Assert.That(script, Is.Not.StringContaining("unique (C)"));
+			Assert.That(script, Does.Contain("unique (A, C)"));
+			Assert.That(script, Does.Contain("unique (B, C)"));
+			Assert.That(script, Does.Not.Contain("unique (C)"));
 
 			new SchemaExport(cfg).Drop(false, true);
 		}
@@ -70,7 +68,8 @@ assembly='NHibernate.Test'>
 		[Test]
 		public void GenerateSchemaMultipleIndex()
 		{
-			if (!(Dialect.Dialect.GetDialect() is MsSql2000Dialect))
+			var cfg = GetConf();
+			if (!(Dialect.Dialect.GetDialect(cfg.Properties) is MsSql2000Dialect))
 			{
 				Assert.Ignore("Specific for MsSql2000Dialect");
 			}
@@ -88,14 +87,13 @@ assembly='NHibernate.Test'>
     </class>
 </hibernate-mapping>";
 
-			var cfg = GetConf();
 			cfg.AddXmlString(hbm);
 
 			var scriptB = new StringBuilder();
 			new SchemaExport(cfg).Create(sl => scriptB.Append(sl), true);
 			var script = scriptB.ToString();
-			Assert.That(script, Is.StringContaining("create index AC on Entity (A, C)"));
-			Assert.That(script, Is.StringContaining("create index BC on Entity (B, C)"));
+			Assert.That(script, Does.Contain("create index AC on Entity (A, C)"));
+			Assert.That(script, Does.Contain("create index BC on Entity (B, C)"));
 
 			new SchemaExport(cfg).Drop(false, true);
 		}
@@ -103,7 +101,8 @@ assembly='NHibernate.Test'>
 		[Test]
 		public void GenerateSchemaMultipleIndexOnColumn()
 		{
-			if (!(Dialect.Dialect.GetDialect() is MsSql2000Dialect))
+			var cfg = GetConf();
+			if (!(Dialect.Dialect.GetDialect(cfg.Properties) is MsSql2000Dialect))
 			{
 				Assert.Ignore("Specific for MsSql2000Dialect");
 			}
@@ -127,21 +126,21 @@ assembly='NHibernate.Test'>
     </class>
 </hibernate-mapping>";
 
-			var cfg = GetConf();
 			cfg.AddXmlString(hbm);
 
 			var scriptB = new StringBuilder();
 			new SchemaExport(cfg).Create(sl => scriptB.Append(sl), true);
 			var script = scriptB.ToString();
-			Assert.That(script, Is.StringContaining("create index AC on Entity (A, C)"));
-			Assert.That(script, Is.StringContaining("create index BC on Entity (B, C)"));
+			Assert.That(script, Does.Contain("create index AC on Entity (A, C)"));
+			Assert.That(script, Does.Contain("create index BC on Entity (B, C)"));
 
 			new SchemaExport(cfg).Drop(false, true);
 		}
 		[Test]
 		public void GenerateSchemaIndexOnId()
 		{
-			if (!(Dialect.Dialect.GetDialect() is MsSql2000Dialect))
+			var cfg = GetConf();
+			if (!(Dialect.Dialect.GetDialect(cfg.Properties) is MsSql2000Dialect))
 			{
 				Assert.Ignore("Specific for MsSql2000Dialect");
 			}
@@ -160,14 +159,13 @@ assembly='NHibernate.Test'>
     </class>
 </hibernate-mapping>";
 
-			var cfg = GetConf();
 			cfg.AddXmlString(hbm);
 
 			var scriptB = new StringBuilder();
 			new SchemaExport(cfg).Create(sl => scriptB.Append(sl), true);
 			var script = scriptB.ToString();
-			Assert.That(script, Is.StringContaining("create index IdxId1 on Entity (Id)"));
-			Assert.That(script, Is.StringContaining("create index IdxId2 on Entity (Id)"));
+			Assert.That(script, Does.Contain("create index IdxId1 on Entity (Id)"));
+			Assert.That(script, Does.Contain("create index IdxId2 on Entity (Id)"));
 
 			new SchemaExport(cfg).Drop(false, true);
 		}
@@ -175,7 +173,8 @@ assembly='NHibernate.Test'>
 		[Test]
 		public void GenerateSchemaUniqueOnId()
 		{
-			if (!(Dialect.Dialect.GetDialect() is MsSql2000Dialect))
+			var cfg = GetConf();
+			if (!(Dialect.Dialect.GetDialect(cfg.Properties) is MsSql2000Dialect))
 			{
 				Assert.Ignore("Specific for MsSql2000Dialect");
 			}
@@ -194,7 +193,6 @@ assembly='NHibernate.Test'>
     </class>
 </hibernate-mapping>";
 
-			var cfg = GetConf();
 			cfg.AddXmlString(hbm);
 
 			var scriptB = new StringBuilder();
@@ -210,6 +208,5 @@ assembly='NHibernate.Test'>
 
 			new SchemaExport(cfg).Drop(false, true);
 		}
-
 	}
 }

@@ -1,7 +1,6 @@
 using System;
 using System.Collections;
-using System.Configuration;
-using System.Data;
+using System.Data.Common;
 
 using NHibernate.Driver;
 using NHibernate.Util;
@@ -13,17 +12,17 @@ namespace NHibernate.Connection
 	/// <summary>
 	/// The base class for the ConnectionProvider.
 	/// </summary>
-	public abstract class ConnectionProvider : IConnectionProvider
+	public abstract partial class ConnectionProvider : IConnectionProvider
 	{
-		private static readonly IInternalLogger log = LoggerProvider.LoggerFor(typeof(ConnectionProvider));
+		private static readonly INHibernateLogger log = NHibernateLogger.For(typeof(ConnectionProvider));
 		private string connString;
 		private IDriver driver;
 
 		/// <summary>
-		/// Closes the <see cref="IDbConnection"/>.
+		/// Closes the <see cref="DbConnection"/>.
 		/// </summary>
-		/// <param name="conn">The <see cref="IDbConnection"/> to clean up.</param>
-		public virtual void CloseConnection(IDbConnection conn)
+		/// <param name="conn">The <see cref="DbConnection"/> to clean up.</param>
+		public virtual void CloseConnection(DbConnection conn)
 		{
 			log.Debug("Closing connection");
 			try
@@ -65,22 +64,15 @@ namespace NHibernate.Connection
 		}
 
 		/// <summary>
-		/// Get the .NET 2.0 named connection string 
+		///  Get a named connection string, if configured.
 		/// </summary>
 		/// <exception cref="HibernateException">
 		/// Thrown when a <see cref="Environment.ConnectionStringName"/> was found 
-		/// in the <c>settings</c> parameter but could not be found in the app.config
+		/// in the <c>settings</c> parameter but could not be found in the app.config.
 		/// </exception>
 		protected virtual string GetNamedConnectionString(IDictionary<string, string> settings)
 		{
-			string connStringName;
-			if(!settings.TryGetValue(Environment.ConnectionStringName, out connStringName))
-				return null;
-
-			ConnectionStringSettings connectionStringSettings = ConfigurationManager.ConnectionStrings[connStringName];
-			if (connectionStringSettings == null)
-				throw new HibernateException(string.Format("Could not find named connection string {0}", connStringName));
-			return connectionStringSettings.ConnectionString;
+			return Environment.GetNamedConnectionString(settings);
 		}
 
 		/// <summary>
@@ -105,7 +97,7 @@ namespace NHibernate.Connection
 				try
 				{
 					driver =
-						(IDriver) Environment.BytecodeProvider.ObjectsFactory.CreateInstance(ReflectHelper.ClassForName(driverClass));
+						(IDriver) Environment.ObjectsFactory.CreateInstance(ReflectHelper.ClassForName(driverClass));
 					driver.Configure(settings);
 				}
 				catch (Exception e)
@@ -116,11 +108,11 @@ namespace NHibernate.Connection
 		}
 
 		/// <summary>
-		/// Gets the <see cref="String"/> for the <see cref="IDbConnection"/>
+		/// Gets the <see cref="String"/> for the <see cref="DbConnection"/>
 		/// to connect to the database.
 		/// </summary>
 		/// <value>
-		/// The <see cref="String"/> for the <see cref="IDbConnection"/>
+		/// The <see cref="String"/> for the <see cref="DbConnection"/>
 		/// to connect to the database.
 		/// </value>
 		protected virtual string ConnectionString
@@ -129,10 +121,10 @@ namespace NHibernate.Connection
 		}
 
 		/// <summary>
-		/// Gets the <see cref="IDriver"/> that can create the <see cref="IDbConnection"/> object.
+		/// Gets the <see cref="IDriver"/> that can create the <see cref="DbConnection"/> object.
 		/// </summary>
 		/// <value>
-		/// The <see cref="IDriver"/> that can create the <see cref="IDbConnection"/>.
+		/// The <see cref="IDriver"/> that can create the <see cref="DbConnection"/>.
 		/// </value>
 		public IDriver Driver
 		{
@@ -140,10 +132,10 @@ namespace NHibernate.Connection
 		}
 
 		/// <summary>
-		/// Get an open <see cref="IDbConnection"/>.
+		/// Get an open <see cref="DbConnection"/>.
 		/// </summary>
-		/// <returns>An open <see cref="IDbConnection"/>.</returns>
-		public abstract IDbConnection GetConnection();
+		/// <returns>An open <see cref="DbConnection"/>.</returns>
+		public abstract DbConnection GetConnection();
 
 		#region IDisposable Members
 
@@ -198,13 +190,13 @@ namespace NHibernate.Connection
 			if (isDisposing)
 			{
 				log.Debug("Disposing of ConnectionProvider.");
+				// nothing for Finalizer to do - so tell the GC to ignore it
+				GC.SuppressFinalize(this);
 			}
 
 			// free unmanaged resources here
 
 			_isAlreadyDisposed = true;
-			// nothing for Finalizer to do - so tell the GC to ignore it
-			GC.SuppressFinalize(this);
 		}
 
 		#endregion

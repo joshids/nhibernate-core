@@ -19,12 +19,14 @@ namespace NHibernate.Persister.Entity
 	{
 		// the class hierarchy structure
 		private readonly int joinSpan;
+		private IType[] identifierTypes;
 		private readonly string[] qualifiedTableNames;
 		private readonly bool[] isInverseTable;
 		private readonly bool[] isNullableTable;
 		private readonly string[][] keyColumnNames;
 		private readonly bool[] cascadeDeleteEnabled;
-		private readonly bool hasSequentialSelects;
+		private readonly bool hasSequentialSelects; // TODO 6.0: Remove
+		private readonly bool _hasSequentialSelect;
 		private readonly string[] spaces;
 		private readonly string[] subclassClosure;
 		private readonly string[] subclassTableNameClosure;
@@ -37,6 +39,10 @@ namespace NHibernate.Persister.Entity
 
 		// properties of this class, including inherited properties
 		private readonly int[] propertyTableNumbers;
+
+		// if the id is a property of the base table eg join to property-ref
+		// if the id is not a property the value will be null
+		private readonly Dictionary<int, int> tableIdPropertyNumbers;
 
 		// the closure of all columns used by the entire hierarchy including
 		// subclasses and superclasses of this class
@@ -61,12 +67,14 @@ namespace NHibernate.Persister.Entity
 		private readonly string[][] constraintOrderedKeyColumnNames;
 
 		//private readonly IDictionary propertyTableNumbersByName = new Hashtable();
-		private readonly Dictionary<string, int> propertyTableNumbersByNameAndSubclass = new Dictionary<string, int>();
 
-		private readonly Dictionary<string, SqlString> sequentialSelectStringsByEntityName = new Dictionary<string, SqlString>();
+		private SqlString _sequentialSelectString;
 
 		private static readonly object NullDiscriminator = new object();
 		private static readonly object NotNullDiscriminator = new object();
+
+		//provided so we can join to keys other than the primary key
+		private readonly Dictionary<int, string[]> joinToKeyColumns;
 
 		public SingleTableEntityPersister(PersistentClass persistentClass, ICacheConcurrencyStrategy cache,
 																			ISessionFactoryImplementor factory, IMapping mapping)
@@ -75,13 +83,14 @@ namespace NHibernate.Persister.Entity
 			#region CLASS + TABLE
 
 			joinSpan = persistentClass.JoinClosureSpan + 1;
+			identifierTypes = new IType[joinSpan];
 			qualifiedTableNames = new string[joinSpan];
 			isInverseTable = new bool[joinSpan];
 			isNullableTable = new bool[joinSpan];
 			keyColumnNames = new string[joinSpan][];
 			Table table = persistentClass.RootTable;
-			qualifiedTableNames[0] =
-				table.GetQualifiedName(factory.Dialect, factory.Settings.DefaultCatalogName, factory.Settings.DefaultSchemaName);
+			identifierTypes[0] = IdentifierType;
+			qualifiedTableNames[0] =table.GetQualifiedName(factory.Dialect, factory.Settings.DefaultCatalogName, factory.Settings.DefaultSchemaName);
 			isInverseTable[0] = false;
 			isNullableTable[0] = false;
 			keyColumnNames[0] = IdentifierColumnNames;
@@ -117,6 +126,7 @@ namespace NHibernate.Persister.Entity
 			int j = 1;
 			foreach (Join join in persistentClass.JoinClosureIterator)
 			{
+				identifierTypes[j] = join.Key.Type;
 				qualifiedTableNames[j] = join.Table.GetQualifiedName(factory.Dialect, factory.Settings.DefaultCatalogName, factory.Settings.DefaultSchemaName);
 				isInverseTable[j] = join.IsInverse;
 				isNullableTable[j] = join.IsOptional;
@@ -153,11 +163,16 @@ namespace NHibernate.Persister.Entity
 
 			spaces = qualifiedTableNames.Concat(persistentClass.SynchronizedTables).ToArray();
 
-			bool lazyAvailable = IsInstrumented(EntityMode.Poco);
+			bool lazyAvailable = IsInstrumented;
 
-			bool hasDeferred = false;
+			bool hasDeferred = false; // TODO 6.0: Remove
 			List<string> subclassTables = new List<string>();
 			List<string[]> joinKeyColumns = new List<string[]>();
+			//provided so we can join to keys other than the primary key
+			joinToKeyColumns = new Dictionary<int, string[]>();
+			//Columns that also function as Id's
+			List<Column> idColumns = new List<Column>();
+			tableIdPropertyNumbers = new Dictionary<int, int>();
 			List<bool> isConcretes = new List<bool>();
 			List<bool> isDeferreds = new List<bool>();
 			List<bool> isInverses = new List<bool>();
@@ -177,12 +192,41 @@ namespace NHibernate.Persister.Entity
 				isInverses.Add(join.IsInverse);
 				isNullables.Add(join.IsOptional);
 				isLazies.Add(lazyAvailable && join.IsLazy);
+				if (join.IsSequentialSelect)
+					_hasSequentialSelect = true;
 				if (join.IsSequentialSelect && !persistentClass.IsClassOrSuperclassJoin(join))
 					hasDeferred = true;
 				subclassTables.Add(join.Table.GetQualifiedName(factory.Dialect, factory.Settings.DefaultCatalogName, factory.Settings.DefaultSchemaName));
 
 				var keyCols = join.Key.ColumnIterator.OfType<Column>().Select(col => col.GetQuotedName(factory.Dialect)).ToArray();
 				joinKeyColumns.Add(keyCols);
+
+				//are we joining to other than the primary key?
+				if (join.RefIdProperty != null)
+				{
+					var curTableIndex = joinKeyColumns.Count - 1;
+					//there should only ever be one key
+					var toKeyCols = new List<string>(join.RefIdProperty.ColumnSpan);
+					foreach (Column col in join.RefIdProperty.ColumnIterator)
+					{
+						toKeyCols.Add(col.GetQuotedName(factory.Dialect));
+						
+						//find out what property index this is
+						int i = 0;
+						foreach (var prop in persistentClass.PropertyClosureIterator)
+						{
+							if (prop == @join.RefIdProperty)
+							{
+								tableIdPropertyNumbers.Add(curTableIndex, i);
+								break;
+			}
+							i++;
+						}
+
+						idColumns.Add(col);
+					}
+					joinToKeyColumns.Add(curTableIndex, toKeyCols.ToArray());
+				}
 			}
 
 			subclassTableSequentialSelect = isDeferreds.ToArray();
@@ -205,9 +249,7 @@ namespace NHibernate.Persister.Entity
 					throw new MappingException("Discriminator mapping required for single table polymorphic persistence");
 
 				forceDiscriminator = persistentClass.IsForceDiscriminator;
-				IEnumerator<ISelectable> iSel = discrimValue.ColumnIterator.GetEnumerator();
-				iSel.MoveNext();
-				ISelectable selectable = iSel.Current;
+				var selectable = discrimValue.ColumnIterator.First();
 				if (discrimValue.HasFormula)
 				{
 					Formula formula = (Formula)selectable;
@@ -289,7 +331,6 @@ namespace NHibernate.Persister.Entity
 				int join = persistentClass.GetJoinNumber(prop);
 				propertyJoinNumbers.Add(join);
 
-				propertyTableNumbersByNameAndSubclass[prop.PersistentClass.EntityName + '.' + prop.Name] = join;
 				foreach (ISelectable thing in prop.ColumnIterator)
 				{
 					if (thing.IsFormula)
@@ -382,7 +423,7 @@ namespace NHibernate.Persister.Entity
 			get { return discriminatorValue; }
 		}
 
-		public virtual string[] SubclassClosure
+		public override string[] SubclassClosure
 		{
 			get { return subclassClosure; }
 		}
@@ -422,7 +463,12 @@ namespace NHibernate.Persister.Entity
 			get { return constraintOrderedTableNames; }
 		}
 
-		public override string[][] ContraintOrderedTableKeyColumnClosure
+		public override IType GetIdentifierType(int j)
+		{
+			return identifierTypes[j];
+		}
+
+		public override string[][] ConstraintOrderedTableKeyColumnClosure
 		{
 			get { return constraintOrderedKeyColumnNames; }
 		}
@@ -487,6 +533,55 @@ namespace NHibernate.Persister.Entity
 			return cascadeDeleteEnabled[j];
 		}
 
+		protected override object GetJoinTableId(int table, object obj)
+		{
+			//0 is the base table there is no join
+			if (table == 0)
+				return null;
+
+			//check index first for speed
+			var refIdColumn = GetRefIdColumnOfTable(table);
+			if (refIdColumn == null)
+				return null;
+
+			object[] fields = GetPropertyValues(obj);
+			return GetJoinTableId(table, refIdColumn, fields);
+		}
+
+		//gets the identifier for a join table if other than pk
+		protected override object GetJoinTableId(int table, object[] fields)
+		{
+			//0 is the base table there is no join
+			if (table == 0)
+				return null;
+
+			return GetJoinTableId(table, GetRefIdColumnOfTable(table), fields);
+		}
+
+		private static object GetJoinTableId(int table, int? index, object[] fields)
+		{
+			if (index == null)
+				return null;
+
+			return fields[index.Value];
+		}
+
+		//if the table's id is a reference column, returns the index of that property
+		//returns null if not found
+		protected override int? GetRefIdColumnOfTable(int table)
+		{
+			int value;
+			if (tableIdPropertyNumbers.TryGetValue(table, out value))
+				return value;
+
+			return null;
+		}
+
+		protected override bool IsIdOfTable(int property, int table)
+		{
+			return GetRefIdColumnOfTable(table) == property;
+		}
+
 		protected override bool IsPropertyOfTable(int property, int table)
 		{
 			return propertyTableNumbers[property] == table;
@@ -499,7 +594,7 @@ namespace NHibernate.Persister.Entity
 
 		public override string FromTableFragment(string name)
 		{
-			return TableName + ' ' + name;
+			return TableName + " " + name;
 		}
 
 		public override string FilterFragment(string alias)
@@ -522,7 +617,7 @@ namespace NHibernate.Persister.Entity
 @"The class {0} can't be instatiated and does not have mapped subclasses; 
 possible solutions:
 - don't map the abstract class
-- map the its subclasses.";
+- map its subclasses.";
 
 			if (NeedsDiscriminator)
 			{
@@ -596,79 +691,54 @@ possible solutions:
 				insert.AddColumn(DiscriminatorColumnName, DiscriminatorSQLValue);
 		}
 
+		//Since v5.3
+		[Obsolete("This method has no more usage in NHibernate and will be removed in a future version.")]
 		protected override bool IsSubclassPropertyDeferred(string propertyName, string entityName)
 		{
 			return
-				hasSequentialSelects && IsSubclassTableSequentialSelect(GetSubclassPropertyTableNumber(propertyName, entityName));
+				hasSequentialSelects && IsSubclassTableSequentialSelect(base.GetSubclassPropertyTableNumber(propertyName, entityName));
 		}
 
+		protected override bool IsPropertyDeferred(int propertyIndex)
+		{
+			return _hasSequentialSelect && subclassTableSequentialSelect[GetSubclassPropertyTableNumber(propertyIndex)];
+		}
+
+		//Since v5.3
+		[Obsolete("This property has no more usage in NHibernate and will be removed in a future version.")]
 		public override bool HasSequentialSelect
 		{
 			get { return hasSequentialSelects; }
 		}
 
-		public int GetSubclassPropertyTableNumber(string propertyName, string entityName)
+		//Since v5.3
+		[Obsolete("This method has no more usage in NHibernate and will be removed in a future version.")]
+		public new int GetSubclassPropertyTableNumber(string propertyName, string entityName)
 		{
-			IType type = propertyMapping.ToType(propertyName);
-			if (type.IsAssociationType && ((IAssociationType)type).UseLHSPrimaryKey)
-				return 0;
-			int tabnum;
-			propertyTableNumbersByNameAndSubclass.TryGetValue(entityName + '.' + propertyName, out tabnum);
-			return tabnum;
+			return base.GetSubclassPropertyTableNumber(propertyName, entityName);
 		}
 
+		//Since v5.3
+		[Obsolete("This method has no more usage in NHibernate and will be removed in a future version.")]
 		protected override SqlString GetSequentialSelect(string entityName)
 		{
-			SqlString result;
-			sequentialSelectStringsByEntityName.TryGetValue(entityName, out result);
-			return result;
+			var persister = Factory.GetEntityPersister(entityName) as SingleTableEntityPersister;
+			return persister?.GetSequentialSelect();
 		}
 
-		private SqlString GenerateSequentialSelect(ILoadable persister)
+		protected override SqlString GetSequentialSelect()
 		{
-			//note that this method could easily be moved up to BasicEntityPersister,
-			//if we ever needed to reuse it from other subclasses
+			return _sequentialSelectString;
+		}
 
-			//figure out which tables need to be fetched (only those that contains at least a no-lazy-property)
-			AbstractEntityPersister subclassPersister = (AbstractEntityPersister)persister;
-			var tableNumbers = new HashSet<int>();
-			string[] props = subclassPersister.PropertyNames;
-			string[] classes = subclassPersister.PropertySubclassNames;
-			for (int i = 0; i < props.Length; i++)
-			{
-				int propTableNumber = GetSubclassPropertyTableNumber(props[i], classes[i]);
-				if (IsSubclassTableSequentialSelect(propTableNumber) && !IsSubclassTableLazy(propTableNumber))
-				{
-					tableNumbers.Add(propTableNumber);
-				}
-			}
-			if ((tableNumbers.Count == 0))
-				return null;
+		//provide columns to join to if the key is other than the primary key
+		protected override string[] GetJoinIdKeyColumns(int j)
+		{
+			string[] key;
+			if (joinToKeyColumns.TryGetValue(j, out key))
+				return key;
 
-			//figure out which columns are needed (excludes lazy-properties)
-			List<int> columnNumbers = new List<int>();
-			int[] columnTableNumbers = SubclassColumnTableNumberClosure;
-			for (int i = 0; i < SubclassColumnClosure.Length; i++)
-			{
-				if (tableNumbers.Contains(columnTableNumbers[i]))
-				{
-					columnNumbers.Add(i);
-				}
-			}
-
-			//figure out which formulas are needed (excludes lazy-properties)
-			List<int> formulaNumbers = new List<int>();
-			int[] formulaTableNumbers = SubclassFormulaTableNumberClosure;
-			for (int i = 0; i < SubclassFormulaTemplateClosure.Length; i++)
-			{
-				if (tableNumbers.Contains(formulaTableNumbers[i]))
-				{
-					formulaNumbers.Add(i);
-				}
-			}
-
-			//render the SQL
-			return RenderSelect(tableNumbers.ToArray(), columnNumbers.ToArray(), formulaNumbers.ToArray());
+			return base.GetJoinIdKeyColumns(j);
 		}
 
 		protected override string[] GetSubclassTableKeyColumns(int j)
@@ -716,19 +786,10 @@ possible solutions:
 		public override void PostInstantiate()
 		{
 			base.PostInstantiate();
-			if (hasSequentialSelects)
+			if (_hasSequentialSelect && !IsAbstract)
 			{
-				string[] entityNames = SubclassClosure;
-				for (int i = 1; i < entityNames.Length; i++)
-				{
-					ILoadable loadable = (ILoadable)Factory.GetEntityPersister(entityNames[i]);
-					if (!loadable.IsAbstract)
-					{
-						//perhaps not really necessary...
-						SqlString sequentialSelect = GenerateSequentialSelect(loadable);
-						sequentialSelectStringsByEntityName[entityNames[i]] = sequentialSelect;
-					}
-				}
+				var rootLoadable = (AbstractEntityPersister) Factory.GetEntityPersister(RootEntityName);
+				_sequentialSelectString = rootLoadable.GenerateSequentialSelect(this);
 			}
 		}
 	}

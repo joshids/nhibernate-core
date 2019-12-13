@@ -59,10 +59,15 @@ namespace NHibernate.Test.UtilityTest
 			CheckInput(typeName, expectedTypeName, null);
 		}
 
-		[Test, Ignore("Not a big problem because the next type request will throw the exception"), ExpectedException(typeof(ParserException))]
+		[Test, Ignore("Not a big problem because the next type request will throw the exception")]
 		public void ParseUnmatchedBracket()
 		{
-		  TypeNameParser.Parse("SomeName[");
+			Assert.That(
+				() =>
+				{
+					TypeNameParser.Parse("SomeName[");
+				},
+				Throws.TypeOf<ParserException>());
 		}
 
 		[Test]
@@ -197,12 +202,10 @@ namespace NHibernate.Test.UtilityTest
 
 		public class MyGClass<T>
 		{
-			
 		}
 
 		public class MyComplexClass<T1, T2, T3>
 		{
-
 		}
 
 		[Test]

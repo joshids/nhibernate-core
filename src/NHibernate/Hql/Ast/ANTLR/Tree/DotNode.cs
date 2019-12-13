@@ -20,7 +20,7 @@ namespace NHibernate.Hql.Ast.ANTLR.Tree
 	[CLSCompliant(false)]
 	public class DotNode : FromReferenceNode 
 	{
-		private static readonly IInternalLogger Log = LoggerProvider.LoggerFor(typeof(DotNode));
+		private static readonly INHibernateLogger Log = NHibernateLogger.For(typeof(DotNode));
 
 		private const int DerefUnknown = 0;
 		private const int DerefEntity = 1;
@@ -39,9 +39,11 @@ namespace NHibernate.Hql.Ast.ANTLR.Tree
 		private string _path;
 
 		/// <summary>
-		/// The type of dereference that hapened (DEREF_xxx).
+		/// The type of dereference that happened (DEREF_xxx).
 		/// </summary>
+#pragma warning disable 414
 		private int _dereferenceType = DerefUnknown;
+#pragma warning restore 414
 
 		/// <summary>
 		/// The identifier that is the name of the property.
@@ -115,7 +117,6 @@ namespace NHibernate.Hql.Ast.ANTLR.Tree
 				return _path;
 			}
 		}
-
 
 		public string PropertyPath
 		{
@@ -242,7 +243,6 @@ namespace NHibernate.Hql.Ast.ANTLR.Tree
 			IsResolved = true;
 		}
 
-		
 		public FromReferenceNode GetLhs()
 		{
 			var lhs = ((FromReferenceNode)GetChild(0));
@@ -266,9 +266,9 @@ namespace NHibernate.Hql.Ast.ANTLR.Tree
 
 				// If the lhs is a collection, use CollectionPropertyMapping
 				IType propertyType = fromElement.GetPropertyType(_propertyName, _propertyPath);
-				if (Log.IsDebugEnabled)
+				if (Log.IsDebugEnabled())
 				{
-					Log.Debug("getDataType() : " + _propertyPath + " -> " + propertyType);
+					Log.Debug("getDataType() : {0} -> {1}", _propertyPath, propertyType);
 				}
 
 				DataType = propertyType;
@@ -332,9 +332,9 @@ namespace NHibernate.Hql.Ast.ANTLR.Tree
 			);
 			FromElement elem = factory.CreateCollection( queryableCollection, role, _joinType, _fetch, indexed );
 
-			if ( Log.IsDebugEnabled ) 
+			if ( Log.IsDebugEnabled() ) 
 			{
-				Log.Debug( "dereferenceCollection() : Created new FROM element for " + propName + " : " + elem );
+				Log.Debug("dereferenceCollection() : Created new FROM element for {0} : {1}", propName, elem);
 			}
 
 			SetImpliedJoin( elem );
@@ -356,7 +356,6 @@ namespace NHibernate.Hql.Ast.ANTLR.Tree
 			}
 			Walker.AddQuerySpaces( queryableCollection.CollectionSpaces );	// Always add the collection's query spaces.
 		}
-
 
 		private void DereferenceEntity(EntityType entityType, bool implicitJoin, string classAlias, bool generateJoin, IASTNode parent) 
 		{
@@ -405,9 +404,9 @@ namespace NHibernate.Hql.Ast.ANTLR.Tree
 				// this is the regression style determination which matches the logic of the classic translator
 				joinIsNeeded = generateJoin && ( !Walker.IsInSelect || !Walker.IsShallowQuery);
 			}
-			else 
+			else
 			{
-				joinIsNeeded = generateJoin || ( Walker.IsInSelect || Walker.IsInFrom );
+				joinIsNeeded = generateJoin || ((Walker.IsInSelect && !Walker.IsInCase) || (Walker.IsInFrom && !Walker.IsComparativeExpressionClause));
 			}
 
 			if ( joinIsNeeded ) 
@@ -424,11 +423,11 @@ namespace NHibernate.Hql.Ast.ANTLR.Tree
 		{
 			// special shortcut for id properties, skip the join!
 			// this must only occur at the _end_ of a path expression
-			if (Log.IsDebugEnabled)
+			if (Log.IsDebugEnabled())
 			{
-				Log.Debug("dereferenceShortcut() : property " +
-					propertyName + " in " + FromElement.ClassName +
-					" does not require a join.");
+				Log.Debug("dereferenceShortcut() : property {0} in {1} does not require a join.",
+				          propertyName,
+				          FromElement.ClassName);
 			}
 
 			InitText();
@@ -445,13 +444,13 @@ namespace NHibernate.Hql.Ast.ANTLR.Tree
 		private void DereferenceEntityJoin(string classAlias, EntityType propertyType, bool impliedJoin, IASTNode parent)
 		{
 			_dereferenceType = DerefEntity;
-			if ( Log.IsDebugEnabled ) 
+			if ( Log.IsDebugEnabled() ) 
 			{
-				Log.Debug( "dereferenceEntityJoin() : generating join for " + _propertyName + " in "
-						+ FromElement.ClassName + " "
-						+ ( ( classAlias == null ) ? "{no alias}" : "(" + classAlias + ")" )
-						+ " parent = " + ASTUtil.GetDebugstring( parent )
-				);
+				Log.Debug( "dereferenceEntityJoin() : generating join for {0} in {1} {2} parent = {3}",
+				           _propertyName,
+				           FromElement.ClassName,
+				           ( ( classAlias == null ) ? "{no alias}" : "(" + classAlias + ")" ),
+				           ASTUtil.GetDebugstring( parent ));
 			}
 
 			// Create a new FROM node for the referenced class.
@@ -532,7 +531,6 @@ namespace NHibernate.Hql.Ast.ANTLR.Tree
 			{
 				currentFromClause.AddDuplicateAlias(classAlias, elem);
 			}
-		
 
 			SetImpliedJoin( elem );
 			Walker.AddQuerySpaces( elem.EntityPersister.QuerySpaces );
@@ -557,7 +555,6 @@ namespace NHibernate.Hql.Ast.ANTLR.Tree
 			}
 		}
 
-
 		/// <summary>
 		/// Is the given property name a reference to the primary key of the associated
 		/// entity construed by the given entity type?
@@ -569,7 +566,7 @@ namespace NHibernate.Hql.Ast.ANTLR.Tree
 		/// to customer's PK...
 		/// </summary>
 		/// <param name="propertyName">The name of the property to check.</param>
-		/// <param name="owningType">The type represeting the entity "owning" the property</param>
+		/// <param name="owningType">The type representing the entity "owning" the property</param>
 		/// <returns>True if propertyName references the entity's (owningType->associatedEntity) primary key; false otherwise.</returns>
 		private bool IsReferenceToPrimaryKey(string propertyName, EntityType owningType)
 		{
@@ -597,9 +594,9 @@ namespace NHibernate.Hql.Ast.ANTLR.Tree
 		{
 			if (IsCorrelatedSubselect)
 			{
-				if (Log.IsDebugEnabled)
+				if (Log.IsDebugEnabled())
 				{
-					Log.Debug(methodName + "() : correlated subquery");
+					Log.Debug("{0}() : correlated subquery", methodName);
 				}
 			}
 		}
@@ -608,7 +605,6 @@ namespace NHibernate.Hql.Ast.ANTLR.Tree
 		{
 			get { return Walker.IsSubQuery && FromElement.FromClause != Walker.CurrentFromClause; }
 		}
-
 
 		private void CheckLhsIsNotCollection()
 		{
@@ -642,16 +638,16 @@ namespace NHibernate.Hql.Ast.ANTLR.Tree
 				_propertyName = rhs.Text;
 				_propertyPath = _propertyPath + "." + _propertyName; // Append the new property name onto the unresolved path.
 				dotNode._propertyPath = _propertyPath;
-				if (Log.IsDebugEnabled)
+				if (Log.IsDebugEnabled())
 				{
-					Log.Debug("Unresolved property path is now '" + dotNode._propertyPath + "'");
+					Log.Debug("Unresolved property path is now '{0}'", dotNode._propertyPath);
 				}
 			}
 			else
 			{
-				if (Log.IsDebugEnabled)
+				if (Log.IsDebugEnabled())
 				{
-					Log.Debug("terminal propertyPath = [" + _propertyPath + "]");
+					Log.Debug("terminal propertyPath = [{0}]", _propertyPath);
 				}
 			}
 		}
@@ -659,7 +655,7 @@ namespace NHibernate.Hql.Ast.ANTLR.Tree
 		private void InitText()
 		{
 			string[] cols = GetColumns();
-			string text = StringHelper.Join(", ", cols);
+			string text = string.Join(", ", cols);
 			if (cols.Length > 1 && Walker.IsComparativeExpressionClause)
 			{
 				text = "(" + text + ")";

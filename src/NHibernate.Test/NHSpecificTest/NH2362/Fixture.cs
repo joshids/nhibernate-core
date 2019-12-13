@@ -4,6 +4,7 @@ using NHibernate.Linq;
 
 namespace NHibernate.Test.NHSpecificTest.NH2362
 {
+	[TestFixture]
 	public class Fixture : BugTestCase
 	{
 		[Test]
@@ -17,7 +18,6 @@ namespace NHibernate.Test.NHSpecificTest.NH2362
 					 into g
 					 let totalPrice = g.Sum(p => p.Price)
 					 select new { g.Key.CategoryId, g.Key.SupplierId, TotalPrice = totalPrice }).ToList();
-				
 			}
 		}
 

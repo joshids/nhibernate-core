@@ -1,9 +1,9 @@
-
 using System.Collections;
 using NUnit.Framework;
 
 namespace NHibernate.Test.NHSpecificTest.EntityNameAndInheritance
 {
+	[TestFixture]
 	public class Fixture : BugTestCase
 	{
 		private int id;

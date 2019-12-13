@@ -9,7 +9,7 @@ namespace NHibernate.Cache
 	/// Not valid across multiple application domains. Identifiers are not necessarily
 	/// strictly increasing, but usually are.
 	///	</remarks>
-	public sealed class Timestamper
+	public static class Timestamper
 	{
 		private static object lockObject = new object();
 
@@ -34,7 +34,7 @@ namespace NHibernate.Cache
 			{
 				// Ticks is accurate down to 100 nanoseconds - hibernate uses milliseconds
 				// to help calculate next time so drop the nanoseconds portion.(1ms==1000000ns)
-				long newTime = ((DateTime.Now.Ticks / 10000) - baseDateMs) << BinDigits;
+				long newTime = ((DateTime.UtcNow.Ticks / 10000) - baseDateMs) << BinDigits;
 				if (time < newTime)
 				{
 					time = newTime;
@@ -46,10 +46,6 @@ namespace NHibernate.Cache
 				}
 				return time + counter;
 			}
-		}
-
-		private Timestamper()
-		{
 		}
 	}
 }

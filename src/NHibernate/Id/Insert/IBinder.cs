@@ -1,10 +1,10 @@
-using System.Data;
+using System.Data.Common;
 
 namespace NHibernate.Id.Insert
 {
-	public interface IBinder
+	public partial interface IBinder
 	{
-		object Entity { get;}
-		void BindValues(IDbCommand cm);
+		object Entity { get; }
+		void BindValues(DbCommand cm);
 	}
 }

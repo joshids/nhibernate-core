@@ -1,5 +1,4 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 
 namespace NHibernate.DomainModel
@@ -10,10 +9,9 @@ namespace NHibernate.DomainModel
 		private string _value;
 		private ISet<Multi> _set;
 		private ISet<object> _eagerSet;
-		private IList _list;
+		private IList<SubMulti> _list;
 		private Top _top;
 		private Lower _lower;
-
 
 		public long Id
 		{
@@ -33,7 +31,7 @@ namespace NHibernate.DomainModel
 			set { _set = value; }
 		}
 
-		public IList List
+		public IList<SubMulti> List
 		{
 			get { return _list; }
 			set { _list = value; }

@@ -7,7 +7,8 @@ using NUnit.Framework;
 
 namespace NHibernate.Test.NHSpecificTest.NH2583
 {
-    public class MassTestingMoreOperatorsFixture : AbstractMassTestingFixture
+	[TestFixture]
+	public class MassTestingMoreOperatorsFixture : AbstractMassTestingFixture
     {
         protected override int TestAndAssert(Expression<Func<MyBO, bool>> condition, ISession session, IEnumerable<int> expectedIds)
         {
@@ -78,7 +79,6 @@ namespace NHibernate.Test.NHSpecificTest.NH2583
             RunTest(x => !((x.BO1.I1 + x.BO1.I2) + x.BO1.I2 != null || (x.BO1.I1 + x.BO1.I2) + x.BO1.I2 != null),
                     Setters<TBO1_I, TBO1_I>(MyBO.SetBO1_I1, MyBO.SetBO1_I2));
         }
-
 
         [Test]
         public void TestNestedPlusBehindOrNav2()

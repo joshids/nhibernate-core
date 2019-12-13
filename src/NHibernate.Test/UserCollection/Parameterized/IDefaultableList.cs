@@ -1,8 +1,9 @@
-using System.Collections;
+using System.Collections.Generic;
+
 namespace NHibernate.Test.UserCollection.Parameterized
 {
-	public interface IDefaultableList : IList
+	public interface IDefaultableList : IList<string>
 	{
-		string DefaultValue { get;}
+		string DefaultValue { get; }
 	}
 }

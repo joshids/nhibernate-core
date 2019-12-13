@@ -1,6 +1,10 @@
+using System;
 using NHibernate.Hql;
+using NHibernate.Linq;
 namespace NHibernate.Cfg.Loquacious
 {
+	//Since 5.3
+	[Obsolete("Replaced by direct class usage")]
 	public interface IFluentSessionFactoryConfiguration
 	{
 		/// <summary>
@@ -24,8 +28,10 @@ namespace NHibernate.Cfg.Loquacious
 		ICacheConfiguration Caching { get; }
 
 		IFluentSessionFactoryConfiguration GenerateStatistics();
-		IFluentSessionFactoryConfiguration Using(EntityMode entityMode);
+		IFluentSessionFactoryConfiguration DefaultFlushMode(FlushMode flushMode);
+
 		IFluentSessionFactoryConfiguration ParsingHqlThrough<TQueryTranslator>() where TQueryTranslator : IQueryTranslatorFactory;
+		IFluentSessionFactoryConfiguration ParsingLinqThrough<TQueryProvider>() where TQueryProvider : INhQueryProvider;
 
 		IProxyConfiguration Proxy { get; }
 

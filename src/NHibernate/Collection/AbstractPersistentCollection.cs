@@ -1,7 +1,11 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Data;
+using System.Data.Common;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using NHibernate.Collection.Generic;
 using NHibernate.Engine;
 using NHibernate.Impl;
 using NHibernate.Loader;
@@ -14,8 +18,9 @@ namespace NHibernate.Collection
 	/// <summary>
 	/// Base class for implementing <see cref="IPersistentCollection"/>.
 	/// </summary>
+	// 6.0 TODO: remove ILazyInitializedCollection once IPersistentCollection derives from it
 	[Serializable]
-	public abstract class AbstractPersistentCollection : IPersistentCollection
+	public abstract partial class AbstractPersistentCollection : IPersistentCollection, ILazyInitializedCollection
 	{
 		protected internal static readonly object Unknown = new object(); //place holder
 		protected internal static readonly object NotFound = new object(); //place holder
@@ -25,6 +30,28 @@ namespace NHibernate.Collection
 			object AddedInstance { get; }
 			object Orphan { get; }
 			void Operate();
+		}
+
+		class TypeComparer : IEqualityComparer<object>
+		{
+			private readonly IType _type;
+			private readonly ISessionFactoryImplementor _sessionFactory;
+
+			public TypeComparer(IType type, ISessionFactoryImplementor sessionFactory)
+			{
+				_type = type;
+				_sessionFactory = sessionFactory;
+			}
+
+			public new bool Equals(object x, object y)
+			{
+				return _type.IsEqual(x, y, _sessionFactory);
+			}
+
+			public int GetHashCode(object obj)
+			{
+				return _type.GetHashCode(obj, _sessionFactory);
+			}
 		}
 
 		private class AdditionEnumerable : IEnumerable
@@ -59,9 +86,11 @@ namespace NHibernate.Collection
 						{
 							return enclosingInstance.operationQueue[position].AddedInstance;
 						}
-						catch (IndexOutOfRangeException)
+						catch (IndexOutOfRangeException ex)
 						{
-							throw new InvalidOperationException();
+							throw new InvalidOperationException(
+								"MoveNext as not been called or its last call has yielded false (meaning the enumerator is beyond the end of the enumeration).",
+								ex);
 						}
 					}
 				}
@@ -375,16 +404,34 @@ namespace NHibernate.Collection
 			dirty = true; //needed so that we remove this collection from the second-level cache
 		}
 
-		/// <summary> 
+		// Obsolete since v5.2
+		/// <summary>
 		/// After reading all existing elements from the database,
 		/// add the queued elements to the underlying collection.
 		/// </summary>
+		[Obsolete("Use or override ApplyQueuedOperations instead")]
 		protected virtual void PerformQueuedOperations()
 		{
 			for (int i = 0; i < operationQueue.Count; i++)
 			{
 				operationQueue[i].Operate();
 			}
+		}
+
+		/// <summary>
+		/// After reading all existing elements from the database, do the queued operations
+		/// (adds or removes) on the underlying collection.
+		/// </summary>
+		public virtual void ApplyQueuedOperations()
+		{
+			if (operationQueue == null)
+				throw new InvalidOperationException("There are no operation queue.");
+
+#pragma warning disable 618
+			PerformQueuedOperations();
+#pragma warning restore 618
+
+			operationQueue = null;
 		}
 
 		public void SetSnapshot(object key, string role, object snapshot)
@@ -409,7 +456,7 @@ namespace NHibernate.Collection
 		}
 
 		/// <summary>
-		/// Called just before reading any rows from the <see cref="IDataReader" />
+		/// Called just before reading any rows from the <see cref="DbDataReader" />
 		/// </summary>
 		public virtual void BeginRead()
 		{
@@ -418,7 +465,7 @@ namespace NHibernate.Collection
 		}
 
 		/// <summary>
-		/// Called after reading all rows from the <see cref="IDataReader" />
+		/// Called after reading all rows from the <see cref="DbDataReader" />
 		/// </summary>
 		/// <remarks>
 		/// This should be overridden by sub collections that use temporary collections
@@ -433,18 +480,8 @@ namespace NHibernate.Collection
 		public virtual bool AfterInitialize(ICollectionPersister persister)
 		{
 			SetInitialized();
-			//do this bit after setting initialized to true or it will recurse
-			if (operationQueue != null)
-			{
-				PerformQueuedOperations();
-				operationQueue = null;
-				cachedSize = -1;
-				return false;
-			}
-			else
-			{
-				return true;
-			}
+			cachedSize = -1;
+			return operationQueue == null;
 		}
 
 		/// <summary>
@@ -482,7 +519,7 @@ namespace NHibernate.Collection
 		{
 			var ownerEntityName = role == null ? "Unavailable" : StringHelper.Qualifier(role);
 			throw new LazyInitializationException(ownerEntityName, key, "failed to lazily initialize a collection"
-			                                      + (role == null ? "" : " of role: " + role) + ", " + message);
+												  + (role == null ? "" : " of role: " + role) + ", " + message);
 		}
 
 		/// <summary>
@@ -540,7 +577,7 @@ namespace NHibernate.Collection
 		public virtual bool SetCurrentSession(ISessionImplementor session)
 		{
 			if (session == this.session // NH: added to fix NH-704
-			    && session.PersistenceContext.ContainsCollection(this))
+				&& session.PersistenceContext.ContainsCollection(this))
 			{
 				return false;
 			}
@@ -556,7 +593,7 @@ namespace NHibernate.Collection
 					else
 					{
 						throw new HibernateException("Illegal attempt to associate a collection with two open sessions: "
-						                             + MessageHelper.InfoString(ce.LoadedPersister, ce.LoadedKey, session.Factory));
+													 + MessageHelper.CollectionInfoString(ce.LoadedPersister, this, ce.LoadedKey, session));
 					}
 				}
 				else
@@ -574,7 +611,7 @@ namespace NHibernate.Collection
 		/// <param name="persister">The <see cref="ICollectionPersister"/> for this Collection.</param>
 		/// <returns>
 		/// <see langword="false" /> by default since most collections can determine which rows need to be
-		/// individually updated/inserted/deleted.  Currently only <see cref="PersistentBag"/>'s for <c>many-to-many</c>
+		/// individually updated/inserted/deleted.  Currently only <see cref="PersistentGenericBag{T}"/>'s for <c>many-to-many</c>
 		/// need to be recreated.
 		/// </returns>
 		public virtual bool NeedsRecreate(ICollectionPersister persister)
@@ -584,7 +621,7 @@ namespace NHibernate.Collection
 
 		/// <summary>
 		/// To be called internally by the session, forcing
-		/// immediate initalization.
+		/// immediate initialization.
 		/// </summary>
 		/// <remarks>
 		/// This method is similar to <see cref="Initialize" />, except that different exceptions are thrown.
@@ -690,8 +727,7 @@ namespace NHibernate.Collection
 		/// belong to the collection, and a collection of instances
 		/// that currently belong, return a collection of orphans
 		/// </summary>
-		protected virtual ICollection GetOrphans(ICollection oldElements, ICollection currentElements, string entityName,
-		                                        ISessionImplementor session)
+		protected virtual ICollection GetOrphans(ICollection oldElements, ICollection currentElements, string entityName, ISessionImplementor session)
 		{
 			// short-circuit(s)
 			if (currentElements.Count == 0)
@@ -705,38 +741,65 @@ namespace NHibernate.Collection
 				return oldElements;
 			}
 
-			IType idType = session.Factory.GetEntityPersister(entityName).IdentifierType;
+			if (currentElements.Count == oldElements.Count && currentElements.Cast<object>().SequenceEqual(oldElements.Cast<object>(), new IdentityEqualityComparer()))
+				return Array.Empty<object>();
 
-			// create the collection holding the orphans
-			List<object> res = new List<object>();
+			var persister = session.Factory.GetEntityPersister(entityName);
+			IType idType = persister.IdentifierType;
 
-			// collect EntityIdentifier(s) of the *current* elements - add them into a HashSet for fast access
-			var currentIds = new HashSet<TypedValue>();
+			var currentObjects = new HashSet<object>(new TypeComparer(idType, session.Factory));
 			foreach (object current in currentElements)
 			{
-				if (current != null && ForeignKeys.IsNotTransient(entityName, current, null, session))
+				if (current != null)
 				{
-					object currentId = ForeignKeys.GetEntityIdentifierIfNotUnsaved(entityName, current, session);
-					currentIds.Add(new TypedValue(idType, currentId, session.EntityMode));
+					var id = ForeignKeys.GetIdentifier(persister, current);
+					if (id != null)
+						currentObjects.Add(id);
 				}
 			}
 
-			// iterate over the *old* list
+			List<object> res = new List<object>();
+			// oldElements may contain new elements (one case when session.Save is called on new object with collection filled with new objects)
 			foreach (object old in oldElements)
 			{
-				object oldId = ForeignKeys.GetEntityIdentifierIfNotUnsaved(entityName, old, session);
-				if (!currentIds.Contains(new TypedValue(idType, oldId, session.EntityMode)))
+				if (old != null)
 				{
-					res.Add(old);
+					var id = ForeignKeys.GetIdentifier(persister, old);
+					if (id != null)
+					{
+						if (!currentObjects.Contains(id))
+						{
+							res.Add(old);
+						}
+					}
 				}
 			}
 
 			return res;
 		}
 
+		// Since 5.3
+		/// <summary> 
+		/// Given a collection of entity instances that used to
+		/// belong to the collection, and a collection of instances
+		/// that currently belong, return a collection of orphans
+		/// </summary>
+		[Obsolete("This method has no more usages and will be removed in a future version")]
+		protected virtual Task<ICollection> GetOrphansAsync(ICollection oldElements, ICollection currentElements, string entityName, ISessionImplementor session, CancellationToken cancellationToken)
+		{
+			if (cancellationToken.IsCancellationRequested)
+			{
+				return Task.FromCanceled<ICollection>(cancellationToken);
+			}
+
+			return Task.FromResult(GetOrphans(oldElements, currentElements, entityName, session));
+		}
+
+		// Since 5.3
+		[Obsolete("This method has no more usages and will be removed in a future version")]
 		public void IdentityRemove(IList list, object obj, string entityName, ISessionImplementor session)
 		{
-			if (obj != null && ForeignKeys.IsNotTransient(entityName, obj, null, session))
+			if (obj != null && ForeignKeys.IsNotTransientSlow(entityName, obj, session))
 			{
 				IType idType = session.Factory.GetEntityPersister(entityName).IdentifierType;
 
@@ -749,7 +812,7 @@ namespace NHibernate.Collection
 						continue;
 					}
 					object idOfOld = ForeignKeys.GetEntityIdentifierIfNotUnsaved(entityName, current, session);
-					if (idType.IsEqual(idOfCurrent, idOfOld, session.EntityMode, session.Factory))
+					if (idType.IsEqual(idOfCurrent, idOfOld, session.Factory))
 					{
 						toRemove.Add(current);
 					}
@@ -821,15 +884,15 @@ namespace NHibernate.Collection
 		public abstract bool NeedsUpdating(object entry, int i, IType elemType);
 
 		/// <summary>
-		/// Reads the row from the <see cref="IDataReader"/>.
+		/// Reads the row from the <see cref="DbDataReader"/>.
 		/// </summary>
-		/// <param name="reader">The IDataReader that contains the value of the Identifier</param>
+		/// <param name="reader">The DbDataReader that contains the value of the Identifier</param>
 		/// <param name="role">The persister for this Collection.</param>
 		/// <param name="descriptor">The descriptor providing result set column names</param>
 		/// <param name="owner">The owner of this Collection.</param>
 		/// <returns>The object that was contained in the row.</returns>
-		public abstract object ReadFrom(IDataReader reader, ICollectionPersister role, ICollectionAliases descriptor,
-		                                object owner);
+		public abstract object ReadFrom(DbDataReader reader, ICollectionPersister role, ICollectionAliases descriptor,
+										object owner);
 
 		public abstract object GetSnapshotElement(object entry, int i);
 
@@ -852,8 +915,31 @@ namespace NHibernate.Collection
 		/// allowing appropriate initializations to occur.
 		/// </summary>
 		/// <param name="persister">The underlying collection persister. </param>
-		/// <param name="anticipatedSize">The anticipated size of the collection after initilization is complete. </param>
+		/// <param name="anticipatedSize">The anticipated size of the collection after initialization is complete. </param>
 		public abstract void BeforeInitialize(ICollectionPersister persister, int anticipatedSize);
+
+		// Since 5.3
+		[Obsolete("This method has no more usages and will be removed in a future version")]
+		public Task<ICollection> GetQueuedOrphansAsync(string entityName, CancellationToken cancellationToken)
+		{
+			if (cancellationToken.IsCancellationRequested)
+			{
+				return Task.FromCanceled<ICollection>(cancellationToken);
+			}
+
+			try
+			{
+				return Task.FromResult(GetQueuedOrphans(entityName));
+			}
+			catch (Exception ex)
+			{
+				return Task.FromException<ICollection>(ex);
+			}
+		}
+		
+		// Since 5.3
+		[Obsolete("This method has no more usages and will be removed in a future version")]
+		public abstract Task<ICollection> GetOrphansAsync(object snapshot, string entityName, CancellationToken cancellationToken);
 
 		#region - Hibernate Collection Proxy Classes
 

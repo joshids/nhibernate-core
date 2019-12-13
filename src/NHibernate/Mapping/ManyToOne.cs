@@ -28,12 +28,21 @@ namespace NHibernate.Mapping
 		}
 
 		private bool isIgnoreNotFound = false;
+		private bool isLogicalOneToOne;
 
 		public bool IsIgnoreNotFound
 		{
 			get { return isIgnoreNotFound; }
 			set { isIgnoreNotFound = value; }
 		}
+
+		public bool IsLogicalOneToOne
+		{
+			get { return isLogicalOneToOne; }
+			set { isLogicalOneToOne = value; }
+		}
+		
+		public string PropertyName { get; set; }
 
 		private IType type;
 		public override IType Type
@@ -43,7 +52,7 @@ namespace NHibernate.Mapping
 				if (type == null)
 				{
 					type =
-						TypeFactory.ManyToOne(ReferencedEntityName, ReferencedPropertyName, IsLazy, UnwrapProxy, Embedded, IsIgnoreNotFound);
+						TypeFactory.ManyToOne(ReferencedEntityName, ReferencedPropertyName, IsLazy, UnwrapProxy, IsIgnoreNotFound, isLogicalOneToOne, PropertyName);
 				}
 				return type;
 			}
@@ -66,20 +75,15 @@ namespace NHibernate.Mapping
 				if (property == null)
 					throw new MappingException("Could not find property " + ReferencedPropertyName + " on " + ReferencedEntityName);
 
-				if (!HasFormula && !"none".Equals(ForeignKeyName, StringComparison.InvariantCultureIgnoreCase))
+				if (!HasFormula && !"none".Equals(ForeignKeyName, StringComparison.OrdinalIgnoreCase))
 				{
-
 					IEnumerable<Column> ce = new SafetyEnumerable<Column>(property.ColumnIterator);
 
-					// NH : The four lines below was added to ensure that related columns have same length,
-					// like ForeignKey.AlignColumns() do
-					IEnumerator<Column> fkCols = ConstraintColumns.GetEnumerator();
-					IEnumerator<Column> pkCols = ce.GetEnumerator();
-					while (fkCols.MoveNext() && pkCols.MoveNext())
-						fkCols.Current.Length = pkCols.Current.Length;
+					// NH : Ensure that related columns have same length
+					ForeignKey.AlignColumns(ConstraintColumns, ce);
 
 					ForeignKey fk =
-						Table.CreateForeignKey(ForeignKeyName, ConstraintColumns, ((EntityType) Type).GetAssociatedEntityName(), ce);
+						Table.CreateForeignKey(ForeignKeyName, ConstraintColumns, ((EntityType)Type).GetAssociatedEntityName(), ce);
 					fk.CascadeDeleteEnabled = IsCascadeDeleteEnabled;
 				}
 			}

@@ -27,7 +27,6 @@ namespace NHibernate.Hql.Ast.ANTLR.Tree
 		{
 			get
 			{
-					
 				IType type = base.DataType;
 				if ( type != null ) 
 				{
@@ -39,7 +38,7 @@ namespace NHibernate.Hql.Ast.ANTLR.Tree
 					return fe.DataType;
 				}
 				ISQLFunction sf = Walker.SessionFactoryHelper.FindSQLFunction(Text);
-				return sf == null ? null : sf.ReturnType(null, null);
+				return sf?.ReturnType(null, Walker.SessionFactoryHelper.Factory);
 			}
 
 			set
@@ -209,7 +208,7 @@ namespace NHibernate.Hql.Ast.ANTLR.Tree
 					? persister.ToColumns(fromElement.TableAlias, property)
 					: persister.ToColumns(property);
 
-			string text = StringHelper.Join(", ", columns);
+			string text = string.Join(", ", columns);
 			Text = columns.Length == 1 ? text : "(" + text + ")";
 			Type = HqlSqlWalker.SQL_TOKEN;
 
@@ -239,7 +238,7 @@ namespace NHibernate.Hql.Ast.ANTLR.Tree
 				throw new QueryException("Property '" + OriginalText + "' is not a component.  Use an alias to reference associations or collections.");
 			}
 
-			IType propertyType ;  // used to set the type of the parent dot node
+			IType propertyType; // used to set the type of the parent dot node
 			string propertyPath = Text + "." + NextSibling.Text;
 			try
 			{
@@ -291,7 +290,6 @@ namespace NHibernate.Hql.Ast.ANTLR.Tree
 			return true;
 		}
 
-
 		private IType GetNakedPropertyType(FromElement fromElement)
 		{
 			if (fromElement == null)
@@ -314,14 +312,14 @@ namespace NHibernate.Hql.Ast.ANTLR.Tree
 
 		private FromElement LocateSingleFromElement()
 		{
-			IList<IASTNode> fromElements = Walker.CurrentFromClause.GetFromElements();
+			var fromElements = Walker.CurrentFromClause.GetFromElementsTyped();
 			if (fromElements == null || fromElements.Count != 1)
 			{
 				// TODO : should this be an error?
 				return null;
 			}
 
-			FromElement element = (FromElement)fromElements[0];
+			FromElement element = fromElements[0];
 			if (element.ClassAlias != null)
 			{
 				// naked property-refs cannot be used with an aliased from element

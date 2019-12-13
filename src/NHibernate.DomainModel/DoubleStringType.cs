@@ -1,5 +1,5 @@
 using System;
-using System.Data;
+using System.Data.Common;
 
 using NHibernate.Engine;
 using NHibernate.Type;
@@ -49,7 +49,7 @@ namespace NHibernate.DomainModel
 			get { return true; }
 		}
 
-		public Object NullSafeGet(IDataReader rs, string[] names, ISessionImplementor session, Object owner)
+		public Object NullSafeGet(DbDataReader rs, string[] names, ISessionImplementor session, Object owner)
 		{
 			string first = (string) NHibernateUtil.String.NullSafeGet(rs, names[0], session, owner);
 			string second = (string) NHibernateUtil.String.NullSafeGet(rs, names[1], session, owner);
@@ -57,8 +57,7 @@ namespace NHibernate.DomainModel
 			return (first == null && second == null) ? null : new string[] {first, second};
 		}
 
-
-		public void NullSafeSet(IDbCommand st, Object value, int index, bool[] settable, ISessionImplementor session)
+		public void NullSafeSet(DbCommand st, Object value, int index, bool[] settable, ISessionImplementor session)
 		{
 			string[] strings = (value == null) ? new string[2] : (string[]) value;
 

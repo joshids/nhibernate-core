@@ -9,7 +9,7 @@ using NUnit.Framework;
 namespace NHibernate.Test.SqlCommandTest
 {
 	/// <summary>
-	/// Tests all of the functionallity of the SqlDeleteBuilderFixture
+	/// Tests all of the functionality of the SqlDeleteBuilderFixture
 	/// </summary>
 	[TestFixture]
 	public class SqlDeleteBuilderFixture
@@ -24,7 +24,6 @@ namespace NHibernate.Test.SqlCommandTest
 			SqlDeleteBuilder delete = new SqlDeleteBuilder(factoryImpl.Dialect, factoryImpl);
 
 			delete.SetTableName("test_delete_builder");
-
 
 			delete.SetIdentityColumn(new string[] {"decimalColumn"}, NHibernateUtil.Decimal);
 			delete.SetVersionColumn(new string[] {"versionColumn"}, (IVersionType) NHibernateUtil.Int32);

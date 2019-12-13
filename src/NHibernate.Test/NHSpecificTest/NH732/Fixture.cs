@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
-using System.Data;
-using NHibernate;
+using System.Data.Common;
 using NHibernate.Dialect;
+using NHibernate.Engine;
 using NHibernate.SqlTypes;
 using NHibernate.UserTypes;
 using NUnit.Framework;
@@ -12,7 +12,6 @@ namespace NHibernate.Test.NHSpecificTest.NH732
 	[TestFixture]
 	public class Fixture : BugTestCase
 	{
-
 		protected override bool AppliesTo(Dialect.Dialect dialect)
 		{
 			return dialect is MsSql2000Dialect;
@@ -68,7 +67,6 @@ namespace NHibernate.Test.NHSpecificTest.NH732
 			get { return typeof (string); }
 		}
 
-		
 		public new bool Equals(object x, object y)
 		{
 			return StringComparer.InvariantCultureIgnoreCase.Equals((string)x, (string)y);
@@ -79,7 +77,7 @@ namespace NHibernate.Test.NHSpecificTest.NH732
 			return StringComparer.InvariantCultureIgnoreCase.GetHashCode((string)x);
 		}
 
-		public object NullSafeGet(IDataReader rs, string[] names, object owner)
+		public object NullSafeGet(DbDataReader rs, string[] names, ISessionImplementor session, object owner)
 		{
 			int ordinal = rs.GetOrdinal(names[0]);
 			string s = rs.GetString(ordinal);
@@ -91,11 +89,10 @@ namespace NHibernate.Test.NHSpecificTest.NH732
 			 */
 		}
 
-		public void NullSafeSet(IDbCommand cmd, object value, int index)
+		public void NullSafeSet(DbCommand cmd, object value, int index, ISessionImplementor session)
 		{
-			IDbDataParameter parameter = (IDbDataParameter)cmd.Parameters[index];
-			parameter.Value =
-				value == null ? DBNull.Value : value;
+			var parameter = cmd.Parameters[index];
+			parameter.Value = value ?? DBNull.Value;
 		}
 
 		public object DeepCopy(object value)

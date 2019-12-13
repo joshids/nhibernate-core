@@ -1,21 +1,20 @@
-
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Linq.Expressions;
-
+using System.Threading;
 using NHibernate.Criterion.Lambda;
 using NHibernate.Engine;
 using NHibernate.Impl;
+using NHibernate.Loader;
 using NHibernate.SqlCommand;
 using NHibernate.Transform;
 
 namespace NHibernate.Criterion
 {
-
 	[Serializable]
 	public abstract class QueryOver
 	{
-
 		protected ICriteria criteria;
 		protected CriteriaImpl impl;
 
@@ -56,11 +55,19 @@ namespace NHibernate.Criterion
 			get { return new DetachedCriteria(impl, impl); }
 		}
 
+		internal static Exception GetDirectUsageException()
+		{
+			return new InvalidOperationException("Not to be used directly - use inside QueryOver expression");
+		}
 	}
 
 	[Serializable]
-	public abstract class QueryOver<TRoot> : QueryOver, IQueryOver<TRoot>
+	public abstract partial class QueryOver<TRoot> : QueryOver, IQueryOver<TRoot>
 	{
+		protected internal QueryOver<TRoot, TSubType> Create<TSubType>(ICriteria criteria)
+		{
+			return new QueryOver<TRoot, TSubType>(impl, criteria);
+		}
 
 		private IList<TRoot> List()
 		{
@@ -82,12 +89,12 @@ namespace NHibernate.Criterion
 			return criteria.UniqueResult<U>();
 		}
 
-		private IEnumerable<TRoot> Future()
+		private IFutureEnumerable<TRoot> Future()
 		{
 			return criteria.Future<TRoot>();
 		}
 
-		private IEnumerable<U> Future<U>()
+		private IFutureEnumerable<U> Future<U>()
 		{
 			return criteria.Future<U>();
 		}
@@ -209,7 +216,6 @@ namespace NHibernate.Criterion
 			throw new HibernateException("Incorrect syntax;  .As<T> method is for use in Lambda expressions only.");
 		}
 
-
 		IList<TRoot> IQueryOver<TRoot>.List()
 		{ return List(); }
 
@@ -234,10 +240,10 @@ namespace NHibernate.Criterion
 		U IQueryOver<TRoot>.SingleOrDefault<U>()
 		{ return SingleOrDefault<U>(); }
 
-		IEnumerable<TRoot> IQueryOver<TRoot>.Future()
+		IFutureEnumerable<TRoot> IQueryOver<TRoot>.Future()
 		{ return Future(); }
 
-		IEnumerable<U> IQueryOver<TRoot>.Future<U>()
+		IFutureEnumerable<U> IQueryOver<TRoot>.Future<U>()
 		{ return Future<U>(); }
 
 		IFutureValue<TRoot> IQueryOver<TRoot>.FutureValue()
@@ -269,16 +275,15 @@ namespace NHibernate.Criterion
 
 		IQueryOver<TRoot> IQueryOver<TRoot>.ReadOnly()
 		{ return ReadOnly(); }
-
 	}
 
 	/// <summary>
 	/// Implementation of the <see cref="IQueryOver&lt;TRoot, TSubType&gt;"/> interface
 	/// </summary>
 	[Serializable]
-	public class QueryOver<TRoot,TSubType> : QueryOver<TRoot>, IQueryOver<TRoot,TSubType>
+	public class QueryOver<TRoot,TSubType> : QueryOver<TRoot>, IQueryOver<TRoot,TSubType>,
+		ISupportEntityJoinQueryOver<TRoot>, ISupportSelectModeQueryOver<TRoot, TSubType>
 	{
-
 		protected internal QueryOver()
 		{
 			impl = new CriteriaImpl(typeof(TRoot), null);
@@ -342,6 +347,11 @@ namespace NHibernate.Criterion
 			return AddNot(expression);
 		}
 
+		public QueryOver<TRoot, TSubType> AndNot(ICriterion expression)
+		{
+			return AddNot(expression);
+		}
+		
 		public QueryOverRestrictionBuilder<TRoot,TSubType> AndRestrictionOn(Expression<Func<TSubType, object>> expression)
 		{
 			return new QueryOverRestrictionBuilder<TRoot,TSubType>(this, ExpressionProcessor.FindMemberProjection(expression.Body));
@@ -373,6 +383,11 @@ namespace NHibernate.Criterion
 		}
 
 		public QueryOver<TRoot,TSubType> WhereNot(Expression<Func<bool>> expression)
+		{
+			return AddNot(expression);
+		}
+
+		public QueryOver<TRoot, TSubType> WhereNot(ICriterion expression)
 		{
 			return AddNot(expression);
 		}
@@ -461,6 +476,8 @@ namespace NHibernate.Criterion
 			get { return new QueryOverSubqueryBuilder<TRoot,TSubType>(this); }
 		}
 
+		// Since v5.2
+		[Obsolete("Use Fetch(SelectMode mode, Expression<Func<TSubType, object>> path) instead")]
 		public QueryOverFetchBuilder<TRoot,TSubType> Fetch(Expression<Func<TRoot, object>> path)
 		{
 			return new QueryOverFetchBuilder<TRoot,TSubType>(this, path);
@@ -644,6 +661,16 @@ namespace NHibernate.Criterion
 					joinType));
 		}
 
+		public QueryOver<TRoot, U> JoinEntityQueryOver<U>(Expression<Func<U>> alias, Expression<Func<bool>> withClause, JoinType joinType = JoinType.InnerJoin, string entityName = null)
+		{
+			return JoinEntityQueryOver(alias, Restrictions.Where(withClause), joinType, entityName);
+		}
+
+		public QueryOver<TRoot, U> JoinEntityQueryOver<U>(Expression<Func<U>> alias, ICriterion withClause, JoinType joinType = JoinType.InnerJoin, string entityName = null)
+		{
+			return Create<U>(criteria.CreateEntityCriteria(alias, withClause, joinType, entityName));
+		}
+
 		public QueryOver<TRoot,TSubType> JoinAlias(Expression<Func<TSubType, object>> path, Expression<Func<object>> alias)
 		{
 			return AddAlias(
@@ -774,7 +801,12 @@ namespace NHibernate.Criterion
 			return this;
 		}
 
-
+		private QueryOver<TRoot, TSubType> AddNot(ICriterion expression)
+		{
+			criteria.Add(Restrictions.Not(expression));
+			return this;
+		}
+		
 		IQueryOver<TRoot,TSubType> IQueryOver<TRoot,TSubType>.And(Expression<Func<TSubType, bool>> expression)
 		{ return And(expression); }
 
@@ -787,7 +819,10 @@ namespace NHibernate.Criterion
 		IQueryOver<TRoot,TSubType> IQueryOver<TRoot,TSubType>.AndNot(Expression<Func<TSubType, bool>> expression)
 		{ return AndNot(expression); }
 
-		IQueryOver<TRoot,TSubType> IQueryOver<TRoot,TSubType>.AndNot(Expression<Func<bool>> expression)
+		IQueryOver<TRoot, TSubType> IQueryOver<TRoot, TSubType>.AndNot(Expression<Func<bool>> expression)
+		{ return AndNot(expression); }
+
+		IQueryOver<TRoot, TSubType> IQueryOver<TRoot, TSubType>.AndNot(ICriterion expression)
 		{ return AndNot(expression); }
 
 		IQueryOverRestrictionBuilder<TRoot,TSubType> IQueryOver<TRoot,TSubType>.AndRestrictionOn(Expression<Func<TSubType, object>> expression)
@@ -809,6 +844,9 @@ namespace NHibernate.Criterion
 		{ return WhereNot(expression); }
 
 		IQueryOver<TRoot,TSubType> IQueryOver<TRoot,TSubType>.WhereNot(Expression<Func<bool>> expression)
+		{ return WhereNot(expression); }
+
+		IQueryOver<TRoot, TSubType> IQueryOver<TRoot, TSubType>.WhereNot(ICriterion expression)
 		{ return WhereNot(expression); }
 
 		IQueryOverRestrictionBuilder<TRoot,TSubType> IQueryOver<TRoot,TSubType>.WhereRestrictionOn(Expression<Func<TSubType, object>> expression)
@@ -856,6 +894,8 @@ namespace NHibernate.Criterion
 		IQueryOverSubqueryBuilder<TRoot,TSubType> IQueryOver<TRoot,TSubType>.WithSubquery
 		{ get { return new IQueryOverSubqueryBuilder<TRoot,TSubType>(this); } }
 
+		// Since v5.2
+		[Obsolete("Use Fetch(SelectMode mode, Expression<Func<TSubType, object>> path) instead")]
 		IQueryOverFetchBuilder<TRoot,TSubType> IQueryOver<TRoot,TSubType>.Fetch(Expression<Func<TRoot, object>> path)
 		{ return new IQueryOverFetchBuilder<TRoot,TSubType>(this, path); }
 
@@ -949,6 +989,11 @@ namespace NHibernate.Criterion
 		IQueryOver<TRoot,TSubType> IQueryOver<TRoot,TSubType>.JoinAlias<U>(Expression<Func<IEnumerable<U>>> path, Expression<Func<U>> alias, JoinType joinType, ICriterion withClause)
 		{ return JoinAlias(path, alias, joinType, withClause); }
 
+		IQueryOver<TRoot, U> ISupportEntityJoinQueryOver<TRoot>.JoinEntityQueryOver<U>(Expression<Func<U>> alias, ICriterion withClause, JoinType joinType, string entityName)
+		{
+			return JoinEntityQueryOver(alias, withClause, joinType, entityName);
+		}
+
 		IQueryOverJoinBuilder<TRoot,TSubType> IQueryOver<TRoot,TSubType>.Inner
 		{ get { return new IQueryOverJoinBuilder<TRoot,TSubType>(this, JoinType.InnerJoin); } }
 
@@ -961,6 +1006,15 @@ namespace NHibernate.Criterion
 		IQueryOverJoinBuilder<TRoot,TSubType> IQueryOver<TRoot,TSubType>.Full
 		{ get { return new IQueryOverJoinBuilder<TRoot,TSubType>(this, JoinType.FullJoin); } }
 
-	}
+		IQueryOver<TRoot, TSubType> ISupportSelectModeQueryOver<TRoot, TSubType>.Fetch(SelectMode mode, Expression<Func<TSubType, object>> path)
+		{
+			return Fetch(mode, path);
+		}
 
+		public QueryOver<TRoot, TSubType> Fetch(SelectMode mode, Expression<Func<TSubType, object>> path)
+		{
+			UnderlyingCriteria.Fetch(mode, ExpressionProcessor.FindMemberExpression(path.Body), null);
+			return this;
+		}
+	}
 }

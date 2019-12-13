@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Runtime.Serialization;
 using System.Text;
 using NHibernate.DebugHelpers;
 
@@ -18,7 +19,7 @@ namespace NHibernate.Util
 	/// </remarks>
 	[DebuggerTypeProxy(typeof(CollectionProxy<>))]
 	[Serializable]
-	public class LinkedHashMap<TKey, TValue> : IDictionary<TKey, TValue>
+	public class LinkedHashMap<TKey, TValue> : IDictionary<TKey, TValue>, IDeserializationCallback
 	{
 		[Serializable]
 		protected class Entry
@@ -359,6 +360,11 @@ namespace NHibernate.Util
 			return result;
 		}
 
+		void IDeserializationCallback.OnDeserialization(object sender)
+		{
+			((IDeserializationCallback)entries).OnDeserialization(sender);
+		}
+
 		#region System.Object Members
 
 		public override string ToString()
@@ -685,6 +691,5 @@ namespace NHibernate.Util
 
 			#endregion
 		}
-
 	}
 }

@@ -1,14 +1,13 @@
 using System;
-using System.Data;
+using System.Data.Common;
 using NHibernate.Engine;
 using NHibernate.SqlTypes;
 
 namespace NHibernate.Type
 {
 	[Serializable]
-	public class EnumCharType<T> : AbstractEnumType
+	public partial class EnumCharType<T> : AbstractEnumType
 	{
-
 		public EnumCharType() : base(new StringFixedLengthSqlType(1),typeof(T))
 		{
 		}
@@ -94,21 +93,20 @@ namespace NHibernate.Type
 			}
 		}
 
-
-		public override void Set(IDbCommand cmd, object value, int index)
+		public override void Set(DbCommand cmd, object value, int index, ISessionImplementor session)
 		{
-			IDataParameter par = (IDataParameter) cmd.Parameters[index];
+			var par = cmd.Parameters[index];
 			if (value == null)
 			{
 				par.Value = DBNull.Value;
 			}
 			else
 			{
-				par.Value = ((Char) (Int32) (value)).ToString();
+				par.Value = GetValue(value).ToString();
 			}
 		}
 
-		public override object Get(IDataReader rs, int index)
+		public override object Get(DbDataReader rs, int index, ISessionImplementor session)
 		{
 			object code = rs[index];
 			if (code == DBNull.Value || code == null)
@@ -121,9 +119,9 @@ namespace NHibernate.Type
 			}
 		}
 
-		public override object Get(IDataReader rs, string name)
+		public override object Get(DbDataReader rs, string name, ISessionImplementor session)
 		{
-			return Get(rs, rs.GetOrdinal(name));
+			return Get(rs, rs.GetOrdinal(name), session);
 		}
 
 		public override string Name
@@ -131,6 +129,18 @@ namespace NHibernate.Type
 			get { return "enumchar - " + this.ReturnedClass.Name; }
 		}
 
+		/// <inheritdoc />
+		public override string ToLoggableString(object value, ISessionFactoryImplementor factory)
+		{
+			return (value == null) ? null :
+				// 6.0 TODO: inline this call.
+#pragma warning disable 618
+				ToString(value);
+#pragma warning restore 618
+		}
+
+		// Since 5.2
+		[Obsolete("This method has no more usages and will be removed in a future version. Override ToLoggableString instead.")]
 		public override string ToString(object value)
 		{
 			return (value == null) ? null : GetValue(value).ToString();
@@ -153,7 +163,8 @@ namespace NHibernate.Type
 			return (value == null) ? null : GetValue(value);
 		}
 
-
+		// Since 5.2
+		[Obsolete("This method has no more usages and will be removed in a future version.")]
 		public override object FromStringValue(string xml)
 		{
 			return GetInstance(xml);

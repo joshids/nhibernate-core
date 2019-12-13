@@ -1,5 +1,6 @@
+using System;
 using System.Collections.Generic;
-using System.Data;
+using System.Data.Common;
 using NHibernate.Cache;
 using NHibernate.Cache.Entry;
 using NHibernate.Collection;
@@ -27,7 +28,7 @@ namespace NHibernate.Persister.Collection
 	/// <para/>
 	/// May be considered an immutable view of the mapping object
 	/// </remarks>
-	public interface ICollectionPersister
+	public partial interface ICollectionPersister
 	{
 		/// <summary>
 		/// Get the cache
@@ -35,7 +36,7 @@ namespace NHibernate.Persister.Collection
 		ICacheConcurrencyStrategy Cache { get; }
 
 		/// <summary> Get the cache structure</summary>
-		ICacheEntryStructure CacheEntryStructure { get;}
+		ICacheEntryStructure CacheEntryStructure { get; }
 
 		/// <summary>
 		/// Get the associated <c>IType</c>
@@ -73,7 +74,7 @@ namespace NHibernate.Persister.Collection
 		bool IsArray { get; }
 
 		/// <summary> Is this a one-to-many association?</summary>
-		bool IsOneToMany { get;}
+		bool IsOneToMany { get; }
 
 		/// <summary> 
 		/// Is this a many-to-many association?  Note that this is mainly
@@ -81,7 +82,7 @@ namespace NHibernate.Persister.Collection
 		/// contain all the information needed to handle a many-to-many
 		/// itself, as internally it is looked at as two many-to-ones.
 		/// </summary>
-		bool IsManyToMany { get;}
+		bool IsManyToMany { get; }
 
 		/// <summary>
 		/// Is this collection lazily initialized?
@@ -89,7 +90,7 @@ namespace NHibernate.Persister.Collection
 		bool IsLazy { get; }
 
 		/// <summary>
-		/// Is this collection "inverse", so state changes are not propogated to the database.
+		/// Is this collection "inverse", so state changes are not propagated to the database.
 		/// </summary>
 		bool IsInverse { get; }
 
@@ -99,7 +100,7 @@ namespace NHibernate.Persister.Collection
 		string Role { get; }
 
 		/// <summary> Get the persister of the entity that "owns" this collection</summary>
-		IEntityPersister OwnerEntityPersister { get;}
+		IEntityPersister OwnerEntityPersister { get; }
 
 		/// <summary>
 		/// Get the surrogate key generation strategy (optional operation)
@@ -120,7 +121,7 @@ namespace NHibernate.Persister.Collection
 		/// Is cascade delete handled by the database-level
 		/// foreign key constraint definition?
 		/// </summary>
-		bool CascadeDeleteEnabled { get;}
+		bool CascadeDeleteEnabled { get; }
 
 		/// <summary> 
 		/// Does this collection cause version increment of the owning entity?
@@ -128,16 +129,10 @@ namespace NHibernate.Persister.Collection
 		bool IsVersioned { get; }
 
 		/// <summary> Can the elements of this collection change?</summary>
-		bool IsMutable { get;}
-
-		string NodeName { get;}
-
-		string ElementNodeName { get;}
-
-		string IndexNodeName { get;}
+		bool IsMutable { get; }
 
 		ISessionFactoryImplementor Factory { get; }
-		bool IsExtraLazy { get;}
+		bool IsExtraLazy { get; }
 
 		/// <summary>
 		/// Initialize the given collection with the given key
@@ -152,27 +147,27 @@ namespace NHibernate.Persister.Collection
 		bool HasCache { get; }
 
 		/// <summary>
-		/// Read the key from a row of the <see cref="IDataReader" />
+		/// Read the key from a row of the <see cref="DbDataReader" />
 		/// </summary>
-		object ReadKey(IDataReader rs, string[] keyAliases, ISessionImplementor session);
+		object ReadKey(DbDataReader rs, string[] keyAliases, ISessionImplementor session);
 
 		/// <summary>
-		/// Read the element from a row of the <see cref="IDataReader" />
+		/// Read the element from a row of the <see cref="DbDataReader" />
 		/// </summary>
 		//TODO: the ReadElement should really be a parameterized TElement
-		object ReadElement(IDataReader rs, object owner, string[] columnAliases, ISessionImplementor session);
+		object ReadElement(DbDataReader rs, object owner, string[] columnAliases, ISessionImplementor session);
 
 		/// <summary>
-		/// Read the index from a row of the <see cref="IDataReader" />
+		/// Read the index from a row of the <see cref="DbDataReader" />
 		/// </summary>
 		//TODO: the ReadIndex should really be a parameterized TIndex
-		object ReadIndex(IDataReader rs, string[] columnAliases, ISessionImplementor session);
+		object ReadIndex(DbDataReader rs, string[] columnAliases, ISessionImplementor session);
 
 		/// <summary>
-		/// Read the identifier from a row of the <see cref="IDataReader" />
+		/// Read the identifier from a row of the <see cref="DbDataReader" />
 		/// </summary>
 		//TODO: the ReadIdentifier should really be a parameterized TIdentifier
-		object ReadIdentifier(IDataReader rs, string columnAlias, ISessionImplementor session);
+		object ReadIdentifier(DbDataReader rs, string columnAlias, ISessionImplementor session);
 
 		string GetManyToManyFilterFragment(string alias, IDictionary<string, IFilter> enabledFilters);
 
@@ -273,7 +268,7 @@ namespace NHibernate.Persister.Collection
 		int GetSize(object key, ISessionImplementor session);
 		bool IndexExists(object key, object index, ISessionImplementor session);
 		bool ElementExists(object key, object element, ISessionImplementor session);
-		
+
 		/// <summary>
 		/// Try to find an element by a given index.
 		/// </summary>
@@ -283,10 +278,45 @@ namespace NHibernate.Persister.Collection
 		/// <param name="owner">The owner of the collection.</param>
 		/// <returns>The value of the element where available; otherwise <see cref="NotFoundObject"/>.</returns>
 		object GetElementByIndex(object key, object index, ISessionImplementor session, object owner);
-		
+
 		/// <summary>
 		/// A place-holder to inform that the data-reader was empty.
 		/// </summary>
 		object NotFoundObject { get; }
+	}
+
+	//6.0 TODO: Merge into ICollectionPersister
+	public static class CollectionPersisterExtensions
+	{
+		/// <summary>
+		/// Get the batch size of a collection persister.
+		/// </summary>
+		//6.0 TODO: Merge into ICollectionPersister and convert to a property.
+		public static int GetBatchSize(this ICollectionPersister persister)
+		{
+			if (persister is AbstractCollectionPersister acp)
+			{
+				return acp.GetBatchSize();
+			}
+
+			NHibernateLogger
+				.For(typeof(CollectionPersisterExtensions))
+				.Warn("Collection persister of {0} type is not supported, returning 1 as a batch size.", persister?.GetType());
+
+			return 1;
+		}
+
+		/// <summary>
+		/// Is this persister has enabled many-to-many filter or has many-to-many where clause
+		/// </summary>
+		internal static bool IsManyToManyFiltered(this ICollectionPersister persister, IDictionary<string, IFilter> enabledFilters)
+		{
+			if (persister is AbstractCollectionPersister acp)
+			{
+				return acp.IsManyToManyFiltered(enabledFilters);
+			}
+
+			return persister.IsManyToMany && !string.IsNullOrEmpty(persister.GetManyToManyFilterFragment("x", enabledFilters));
+		}
 	}
 }

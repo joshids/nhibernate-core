@@ -7,11 +7,9 @@ using NHibernate.Criterion;
 
 namespace NHibernate.Test.Criteria.Lambda
 {
-
 	[TestFixture]
 	public class RestrictionsFixture : LambdaFixtureBase
 	{
-
 		[Test]
 		public void ArbitraryCriterion()
 		{
@@ -258,6 +256,8 @@ namespace NHibernate.Test.Criteria.Lambda
 		[Test]
 		public void FunctionExtensions()
 		{
+			var date = new DateTime(1970, 1, 1);
+
 			ICriteria expected =
 				CreateTestCriteria(typeof(Person))
 					.Add(Restrictions.Eq(Projections.SqlFunction("year", NHibernateUtil.Int32, Projections.Property("BirthDate")), 1970))
@@ -266,6 +266,14 @@ namespace NHibernate.Test.Criteria.Lambda
 					.Add(Restrictions.Eq(Projections.SqlFunction("hour", NHibernateUtil.Int32, Projections.Property("BirthDate")), 1))
 					.Add(Restrictions.Eq(Projections.SqlFunction("minute", NHibernateUtil.Int32, Projections.Property("BirthDate")), 1))
 					.Add(Restrictions.Eq(Projections.SqlFunction("second", NHibernateUtil.Int32, Projections.Property("BirthDate")), 1))
+					.Add(Restrictions.Eq(Projections.SqlFunction("date", NHibernateUtil.Date, Projections.Property("BirthDate")), date))
+					.Add(Restrictions.Eq(Projections.SqlFunction("date", NHibernateUtil.Date, Projections.Property("BirthDateAsDateTimeOffset")), date))
+					.Add(Restrictions.Eq(Projections.SqlFunction("year", NHibernateUtil.Int32, Projections.Property("BirthDateAsDateTimeOffset")), 1970))
+					.Add(Restrictions.Eq(Projections.SqlFunction("day", NHibernateUtil.Int32, Projections.Property("BirthDateAsDateTimeOffset")), 1))
+					.Add(Restrictions.Eq(Projections.SqlFunction("month", NHibernateUtil.Int32, Projections.Property("BirthDateAsDateTimeOffset")), 1))
+					.Add(Restrictions.Eq(Projections.SqlFunction("hour", NHibernateUtil.Int32, Projections.Property("BirthDateAsDateTimeOffset")), 1))
+					.Add(Restrictions.Eq(Projections.SqlFunction("minute", NHibernateUtil.Int32, Projections.Property("BirthDateAsDateTimeOffset")), 1))
+					.Add(Restrictions.Eq(Projections.SqlFunction("second", NHibernateUtil.Int32, Projections.Property("BirthDateAsDateTimeOffset")), 1))
 					.Add(Restrictions.Eq(Projections.SqlFunction("sqrt", NHibernateUtil.Double, Projections.Property("Height")), 10d))
 					.Add(Restrictions.Eq(Projections.SqlFunction("lower", NHibernateUtil.String, Projections.Property("Name")), "test"))
 					.Add(Restrictions.Eq(Projections.SqlFunction("upper", NHibernateUtil.String, Projections.Property("Name")), "TEST"))
@@ -274,20 +282,32 @@ namespace NHibernate.Test.Criteria.Lambda
 					.Add(Restrictions.Eq(Projections.SqlFunction("length", NHibernateUtil.String, Projections.Property("Name")), 4))
 					.Add(Restrictions.Eq(Projections.SqlFunction("bit_length", NHibernateUtil.String, Projections.Property("Name")), 32))
 					.Add(Restrictions.Eq(Projections.SqlFunction("substring", NHibernateUtil.String, Projections.Property("Name"), Projections.Constant(1), Projections.Constant(2)), "te"))
+					.Add(Restrictions.Eq(Projections.SqlFunction("substring", NHibernateUtil.String, Projections.Property("Name"), Projections.Property("Age"), Projections.Constant(2)), "te"))
 					.Add(Restrictions.Eq(Projections.SqlFunction("locate", NHibernateUtil.String, Projections.Constant("e"), Projections.Property("Name"), Projections.Constant(1)), 2))
-					.Add(Restrictions.Eq(Projections.SqlFunction("coalesce", NHibernateUtil.Object, Projections.Property("Name"), Projections.Constant("not-null-val")), "test"))
-					.Add(Restrictions.Eq(Projections.SqlFunction("coalesce", NHibernateUtil.Object, Projections.Property("NullableIsParent"), Projections.Constant(true)), true))
+					.Add(Restrictions.Eq(Projections.SqlFunction("locate", NHibernateUtil.String, Projections.Constant("e"), Projections.Property("Name"), Projections.Property("Age")), 2))
+					.Add(Restrictions.Eq(new SqlFunctionProjection("coalesce", Projections.Property("Name"), Projections.Property("Name"), Projections.Constant("not-null-val")), "test"))
+					.Add(Restrictions.Eq(new SqlFunctionProjection("coalesce", Projections.Property("Name"), Projections.Property("Name"), Projections.Property("Nickname")), "test"))
+					.Add(Restrictions.Eq(new SqlFunctionProjection("coalesce", Projections.Property("NullableIsParent"), Projections.Property("NullableIsParent"), Projections.Constant(true)), true))
 					.Add(Restrictions.Eq(Projections.SqlFunction("concat", NHibernateUtil.String, Projections.Property("Name"), Projections.Constant(", "), Projections.Property("Name")), "test, test"))
-					.Add(Restrictions.Eq(Projections.SqlFunction("mod", NHibernateUtil.Int32, Projections.Property("Height"), Projections.Constant(10)), 0));
+					.Add(Restrictions.Eq(Projections.SqlFunction("mod", NHibernateUtil.Int32, Projections.Property("Height"), Projections.Constant(10)), 0))
+					.Add(Restrictions.Eq(Projections.SqlFunction("mod", NHibernateUtil.Int32, Projections.Property("Height"), Projections.Property("Age")), 0));
 
 			IQueryOver<Person> actual =
 				CreateTestQueryOver<Person>()
-					.Where(p => p.BirthDate.YearPart() == 1970)
-					.And(p => p.BirthDate.DayPart() == 1)
-					.And(p => p.BirthDate.MonthPart() == 1)
-					.And(p => p.BirthDate.HourPart() == 1)
-					.And(p => p.BirthDate.MinutePart() == 1)
-					.And(p => p.BirthDate.SecondPart() == 1)
+					.Where(p => p.BirthDate.Year == 1970)
+					.And(p => p.BirthDate.Day == 1)
+					.And(p => p.BirthDate.Month == 1)
+					.And(p => p.BirthDate.Hour == 1)
+					.And(p => p.BirthDate.Minute == 1)
+					.And(p => p.BirthDate.Second == 1)
+					.And(p => p.BirthDate.Date == date)
+					.And(p => p.BirthDateAsDateTimeOffset.Date == date)
+					.And(p => p.BirthDateAsDateTimeOffset.Year == 1970)
+					.And(p => p.BirthDateAsDateTimeOffset.Day == 1)
+					.And(p => p.BirthDateAsDateTimeOffset.Month == 1)
+					.And(p => p.BirthDateAsDateTimeOffset.Hour == 1)
+					.And(p => p.BirthDateAsDateTimeOffset.Minute == 1)
+					.And(p => p.BirthDateAsDateTimeOffset.Second == 1)
 					.And(p => p.Height.Sqrt() == 10)
 					.And(p => p.Name.Lower() == "test")
 					.And(p => p.Name.Upper() == "TEST")
@@ -296,11 +316,15 @@ namespace NHibernate.Test.Criteria.Lambda
 					.And(p => p.Name.StrLength() == 4)
 					.And(p => p.Name.BitLength() == 32)
 					.And(p => p.Name.Substr(1, 2) == "te")
+					.And(p => p.Name.Substr(p.Age, 2) == "te")
 					.And(p => p.Name.CharIndex("e", 1) == 2)
+					.And(p => p.Name.CharIndex("e", p.Age) == 2)
 					.And(p => p.Name.Coalesce("not-null-val") == "test")
+					.And(p => p.Name.Coalesce(p.Nickname) == "test")
 					.And(p => p.NullableIsParent.Coalesce(true) == true)
 					.And(p => Projections.Concat(p.Name, ", ", p.Name) == "test, test")
-					.And(p => p.Height.Mod(10) == 0);
+					.And(p => p.Height.Mod(10) == 0)
+					.And(p => p.Height.Mod(p.Age) == 0);
 
 			AssertCriteriaAreEqual(expected, actual);
 		}
@@ -316,11 +340,9 @@ namespace NHibernate.Test.Criteria.Lambda
 
 			IQueryOver<Person> actual =
 				CreateTestQueryOver<Person>()
-					.Where(p => p.BirthDate.MonthPart() == p.BirthDate.DayPart());
+					.Where(p => p.BirthDate.Month == p.BirthDate.Day);
 
 			AssertCriteriaAreEqual(expected, actual);
 		}
-
 	}
-
 }

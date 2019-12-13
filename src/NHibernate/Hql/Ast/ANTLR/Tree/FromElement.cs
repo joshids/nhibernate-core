@@ -18,7 +18,7 @@ namespace NHibernate.Hql.Ast.ANTLR.Tree
 	[CLSCompliant(false)]
 	public class FromElement : HqlSqlWalkerNode, IDisplayableNode, IParameterContainer
 	{
-		private static readonly IInternalLogger Log = LoggerProvider.LoggerFor(typeof(FromElement));
+		private static readonly INHibernateLogger Log = NHibernateLogger.For(typeof(FromElement));
 
 		private bool _isAllPropertyFetch;
 		private FromElementType _elementType;
@@ -28,6 +28,7 @@ namespace NHibernate.Hql.Ast.ANTLR.Tree
 		private string _collectionTableAlias;
 		private FromClause _fromClause;
 		private string[] _columns;
+		private string[] _fetchLazyProperties;
 		private FromElement _origin;
 		private bool _useFromFragment;
 		private bool _useWhereFragment = true;
@@ -100,7 +101,7 @@ namespace NHibernate.Hql.Ast.ANTLR.Tree
 
 		public bool IsFromOrJoinFragment
 		{
-			get { return Type == HqlSqlWalker.FROM_FRAGMENT || Type == HqlSqlWalker.JOIN_FRAGMENT; }
+			get { return Type == HqlSqlWalker.FROM_FRAGMENT || Type == HqlSqlWalker.JOIN_FRAGMENT || Type == HqlSqlWalker.ENTITY_JOIN; }
 		}
 
 		public bool IsAllPropertyFetch
@@ -109,9 +110,18 @@ namespace NHibernate.Hql.Ast.ANTLR.Tree
 			set { _isAllPropertyFetch = value; }
 		}
 
+		/// <summary>
+		/// Names of lazy properties to be fetched.
+		/// </summary>
+		public string[] FetchLazyProperties
+		{
+			get { return _fetchLazyProperties; }
+			set { _fetchLazyProperties = value; }
+		}
+
 		public virtual bool IsImpliedInFromClause
 		{
-			get { return false; }  // Since this is an explicit FROM element, it can't be implied in the FROM clause.
+			get { return false; } // Since this is an explicit FROM element, it can't be implied in the FROM clause.
 		}
 
 		public bool IsFetch
@@ -327,7 +337,9 @@ namespace NHibernate.Hql.Ast.ANTLR.Tree
 		/// <returns>the property select SQL fragment.</returns>
 		public string RenderPropertySelect(int size, int k)
 		{
-			return _elementType.RenderPropertySelect(size, k, IsAllPropertyFetch);
+			return IsAllPropertyFetch
+				? _elementType.RenderPropertySelect(size, k, IsAllPropertyFetch)
+				: _elementType.RenderPropertySelect(size, k, _fetchLazyProperties);
 		}
 
 		public override SqlString RenderText(Engine.ISessionFactoryImplementor sessionFactory)
@@ -389,9 +401,9 @@ namespace NHibernate.Hql.Ast.ANTLR.Tree
 			{
 				if (IsDereferencedBySuperclassOrSubclassProperty)
 				{
-					if (!_includeSubclasses && Log.IsInfoEnabled)
+					if (!_includeSubclasses && Log.IsInfoEnabled())
 					{
-						Log.Info("attempt to disable subclass-inclusions", new Exception("stack-trace source"));
+						Log.Info(new Exception("stack-trace source"), "attempt to disable subclass-inclusions");
 					}
 				}
 				_includeSubclasses = value;
@@ -445,7 +457,7 @@ namespace NHibernate.Hql.Ast.ANTLR.Tree
 
 		public bool UseWhereFragment
 		{
-			get { return _useWhereFragment;}
+			get { return _useWhereFragment; }
 			set { _useWhereFragment = value; }
 		}
 
@@ -485,11 +497,15 @@ namespace NHibernate.Hql.Ast.ANTLR.Tree
 			{
 				propertyName = EntityPersister.IdentifierPropertyName;
 			}
+			else if (IsCollectionOfValuesOrComponents)
+			{
+				propertyName = CollectionPropertyNames.Elements;
+			}
 			else
 			{
 				propertyName = NHibernate.Persister.Entity.EntityPersister.EntityID;
 			}
-			if (Walker.StatementType == HqlSqlWalker.SELECT)
+			if (Walker.StatementType == HqlSqlWalker.SELECT || Walker.IsSubQuery)
 			{
 				cols = GetPropertyMapping(propertyName).ToColumns(table, propertyName);
 			}
@@ -497,11 +513,13 @@ namespace NHibernate.Hql.Ast.ANTLR.Tree
 			{
 				cols = GetPropertyMapping(propertyName).ToColumns(propertyName);
 			}
-			string result = StringHelper.Join(", ", cols);
+			string result = string.Join(", ", cols);
 
-			// There used to be code here that added parentheses if the number of columns was greater than one.
-			// This was causing invalid queries like select (c1, c2) from x.  I couldn't think of a reason that
-			// parentheses would be wanted around a list of columns, so I removed them.
+			if (cols.Length > 1 && Walker.IsComparativeExpressionClause)
+			{
+				return "(" + result + ")";
+			}
+
 			return result;
 		}
 
@@ -526,9 +544,9 @@ namespace NHibernate.Hql.Ast.ANTLR.Tree
 				{
 					Declarer propertyDeclarer = persister.GetSubclassPropertyDeclarer(propertyName);
 
-					if (Log.IsInfoEnabled)
+					if (Log.IsInfoEnabled())
 					{
-						Log.Info("handling property dereference [" + persister.EntityName + " (" + ClassAlias + ") -> " + propertyName + " (" + propertyDeclarer + ")]");
+						Log.Info("handling property dereference [{0} ({1}) -> {2} ({3})]", persister.EntityName, ClassAlias, propertyName, propertyDeclarer);
 					}
 					if (propertyDeclarer == Declarer.SubClass)
 					{
@@ -540,11 +558,12 @@ namespace NHibernate.Hql.Ast.ANTLR.Tree
 						_dereferencedBySuperclassProperty = true;
 					}
 				}
-				catch (QueryException)
+				catch (QueryException ex)
 				{
 					// ignore it; the incoming property could not be found so we
 					// cannot be sure what to do here.  At the very least, the
 					// safest is to simply not apply any dereference toggling...
+					Log.Debug(ex, "Unable to find property {0}, no dereference will be handled for it.", propertyName);
 				}
 			}
 		}
@@ -591,9 +610,9 @@ namespace NHibernate.Hql.Ast.ANTLR.Tree
 		{
 			if (IsDereferencedBySuperclassOrSubclassProperty)
 			{
-				if (!includeSubclasses && Log.IsInfoEnabled)
+				if (!includeSubclasses && Log.IsInfoEnabled())
 				{
-					Log.Info("attempt to disable subclass-inclusions", new Exception("stack-trace source"));
+					Log.Info(new Exception("stack-trace source"), "attempt to disable subclass-inclusions");
 				}
 			}
 			_includeSubclasses = includeSubclasses;
@@ -680,14 +699,21 @@ namespace NHibernate.Hql.Ast.ANTLR.Tree
 			_className = className;
 			_classAlias = classAlias;
 			_elementType = new FromElementType(this, persister, type);
+			if (Walker == null)
+			{
+				Walker = _fromClause.Walker;
+			}
 
 			// Register the FromElement with the FROM clause, now that we have the names and aliases.
 			fromClause.RegisterFromElement(this);
 
-			if (Log.IsDebugEnabled)
+			if (Log.IsDebugEnabled())
 			{
-				Log.Debug(fromClause + " :  " + className + " ("
-						+ (classAlias ?? "no alias") + ") -> " + tableAlias);
+				Log.Debug("{0} :  {1} ({2}) -> {3}",
+				          fromClause,
+				          className,
+				          (classAlias ?? "no alias"),
+				          tableAlias);
 			}
 		}
 
@@ -703,5 +729,9 @@ namespace NHibernate.Hql.Ast.ANTLR.Tree
 			_embeddedParameters.Add(specification);
 		}
 
+		internal bool IsEntityJoin()
+		{
+			return Type == HqlSqlWalker.ENTITY_JOIN;
+		}
 	}
 }

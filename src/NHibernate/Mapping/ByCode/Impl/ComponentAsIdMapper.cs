@@ -1,7 +1,7 @@
 using System;
-using System.Linq;
 using System.Reflection;
 using NHibernate.Cfg.MappingSchema;
+using NHibernate.Util;
 
 namespace NHibernate.Mapping.ByCode.Impl
 {
@@ -18,6 +18,11 @@ namespace NHibernate.Mapping.ByCode.Impl
 			id.@class = componentType.GetShortClassName(mapDoc);
 			id.name = declaringTypeMember.Name;
 			accessorPropertyMapper = new AccessorPropertyMapper(declaringTypeMember.DeclaringType, declaringTypeMember.Name, x => id.access = x);
+		}
+
+		public void UnsavedValue(UnsavedValueType unsavedValueType)
+		{
+			id.unsavedvalue = (HbmUnsavedValueType)Enum.Parse(typeof(HbmUnsavedValueType), unsavedValueType.ToString());
 		}
 
 		public HbmCompositeId CompositeId
@@ -60,8 +65,7 @@ namespace NHibernate.Mapping.ByCode.Impl
 			{
 				throw new ArgumentNullException("property");
 			}
-			var toAdd = new[] { property };
-			id.Items = id.Items == null ? toAdd : id.Items.Concat(toAdd).ToArray();
+			id.Items = ArrayHelper.Append(id.Items, property);
 		}
 	}
 }

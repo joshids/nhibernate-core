@@ -1,14 +1,12 @@
 using System;
+using NHibernate.Persister.Entity;
 using NHibernate.SqlCommand;
 using NHibernate.Type;
-using NHibernate.Util;
 
 namespace NHibernate.Criterion
 {
-	using System.Collections.Generic;
-
 	[Serializable]
-	public class IdentifierProjection : SimpleProjection
+	public class IdentifierProjection : SimpleProjection, IPropertyProjection
 	{
 		private bool grouped;
 
@@ -23,7 +21,7 @@ namespace NHibernate.Criterion
 
 		public override string ToString()
 		{
-			return "id";
+			return PropertyName;
 		}
 
 		public override IType[] GetTypes(ICriteria criteria, ICriteriaQuery criteriaQuery)
@@ -31,7 +29,7 @@ namespace NHibernate.Criterion
 			return new IType[] {criteriaQuery.GetIdentifierType(criteria)};
 		}
 
-		public override SqlString ToSqlString(ICriteria criteria, int position, ICriteriaQuery criteriaQuery, IDictionary<string, IFilter> enabledFilters)
+		public override SqlString ToSqlString(ICriteria criteria, int position, ICriteriaQuery criteriaQuery)
 		{
 			SqlStringBuilder buf = new SqlStringBuilder();
 			string[] cols = criteriaQuery.GetIdentifierColumns(criteria);
@@ -60,13 +58,15 @@ namespace NHibernate.Criterion
 			get { return false; }
 		}
 
-		public override SqlString ToGroupSqlString(ICriteria criteria, ICriteriaQuery criteriaQuery, IDictionary<string, IFilter> enabledFilters)
+		public override SqlString ToGroupSqlString(ICriteria criteria, ICriteriaQuery criteriaQuery)
 		{
 			if (!grouped)
 			{
 				throw new InvalidOperationException("not a grouping projection");
 			}
-			return new SqlString(StringHelper.Join(",", criteriaQuery.GetIdentifierColumns(criteria)));
+			return new SqlString(string.Join(",", criteriaQuery.GetIdentifierColumns(criteria)));
 		}
+
+		public string PropertyName => EntityPersister.EntityID;
 	}
 }

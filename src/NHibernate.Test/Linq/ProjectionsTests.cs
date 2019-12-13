@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using NHibernate.DomainModel.Northwind.Entities;
 using NUnit.Framework;
-using SharpTestsEx;
 
 namespace NHibernate.Test.Linq
 {
@@ -98,7 +97,6 @@ namespace NHibernate.Test.Linq
 			Assert.AreEqual("nhibernate nhibernate", query[1].DoubleName);
 			Assert.AreEqual("rahien rahien", query[2].DoubleName);
 
-
 			Assert.AreEqual(new DateTime(2010, 06, 17), query[0].RegisteredAt);
 			Assert.AreEqual(new DateTime(2000, 1, 1), query[1].RegisteredAt);
 			Assert.AreEqual(new DateTime(1998, 12, 31), query[2].RegisteredAt);
@@ -116,7 +114,6 @@ namespace NHibernate.Test.Linq
 			Assert.AreEqual("rahien", query[1].Key);
 			Assert.AreEqual("nhibernate", query[2].Key);
 
-
 			Assert.AreEqual(new DateTime(2010, 06, 17), query[0].Value);
 			Assert.AreEqual(new DateTime(1998, 12, 31), query[1].Value);
 			Assert.AreEqual(new DateTime(2000, 1, 1), query[2].Value);
@@ -132,7 +129,6 @@ namespace NHibernate.Test.Linq
 			Assert.AreEqual("ayende", query[0].Name);
 			Assert.AreEqual("rahien", query[1].Name);
 			Assert.AreEqual("nhibernate", query[2].Name);
-
 
 			Assert.AreEqual(new DateTime(2010, 06, 17), query[0].RegisteredAt);
 			Assert.AreEqual(new DateTime(1998, 12, 31), query[1].RegisteredAt);
@@ -205,7 +201,7 @@ namespace NHibernate.Test.Linq
 
 			var firstUser = query.First();
 			Assert.IsNotNull(firstUser);
-			firstUser.Category.Should().Be("something");
+			Assert.That(firstUser.Category, Is.EqualTo("something"));
 		}
 
 		[Test]
@@ -314,6 +310,80 @@ namespace NHibernate.Test.Linq
 			var result = query.ToList();
 			Assert.That(result.Count, Is.EqualTo(830));
 			Assert.That(result[0].ExpandedElement.OrderLines, Is.EquivalentTo(result[0].ProjectedProperty0));
+		}
+
+		[Test]
+		public void ProjectNestedKnownTypeWithCollection()
+		{
+			var query = from o in db.Products
+				select new ExpandedWrapper<Product, ExpandedWrapper<Supplier, IEnumerable<Product>>>
+				{
+					ExpandedElement = o,
+					ProjectedProperty0 = new ExpandedWrapper<Supplier, IEnumerable<Product>>
+					{
+						ExpandedElement = o.Supplier,
+						ProjectedProperty0 = o.Supplier.Products,
+						Description = "Products",
+						ReferenceDescription = ""
+					},
+					Description = "Supplier",
+					ReferenceDescription = "Supplier"
+				};
+
+			var result = query.ToList();
+			Assert.That(result, Has.Count.EqualTo(77));
+			Assert.That(result[0].ExpandedElement.Supplier, Is.EqualTo(result[0].ProjectedProperty0.ExpandedElement));
+			Assert.That(result[0].ExpandedElement.Supplier.Products,
+				Is.EquivalentTo(result[0].ProjectedProperty0.ProjectedProperty0));
+		}
+
+		[Test]
+		public void ProjectNestedAnonymousTypeWithCollection()
+		{
+			var query = from o in db.Products
+				select new
+				{
+					ExpandedElement = o,
+					ProjectedProperty0 = new
+					{
+						ExpandedElement = o.Supplier,
+						ProjectedProperty0 = o.Supplier.Products,
+						Description = "Products",
+						ReferenceDescription = ""
+					},
+					Description = "Supplier",
+					ReferenceDescription = "Supplier"
+				};
+
+			var result = query.ToList();
+			Assert.That(result, Has.Count.EqualTo(77));
+			Assert.That(result[0].ExpandedElement.Supplier, Is.EqualTo(result[0].ProjectedProperty0.ExpandedElement));
+			Assert.That(result[0].ExpandedElement.Supplier.Products,
+				Is.EquivalentTo(result[0].ProjectedProperty0.ProjectedProperty0));
+		}
+
+		[Test]
+		public void ProjectNestedAnonymousTypeWithProjectedCollection()
+		{
+			var query = from o in db.Products
+				select new
+				{
+					ExpandedElement = o,
+					ProjectedProperty0 = new
+					{
+						ExpandedElement = o.Supplier,
+						ProjectedProperty0 = o.Supplier.Products.Select(x => new {x.Name}),
+						Description = "Products",
+						ReferenceDescription = ""
+					},
+					Description = "Supplier",
+					ReferenceDescription = "Supplier"
+				};
+
+			var result = query.ToList();
+			Assert.That(result, Has.Count.EqualTo(77));
+			Assert.That(result.Single(x => x.ExpandedElement.ProductId == 1).ProjectedProperty0.ProjectedProperty0.Count(),
+				Is.EqualTo(3));
 		}
 
 		[Test]
@@ -437,7 +507,6 @@ namespace NHibernate.Test.Linq
 		{
 			return string.Format("User {0} logged in at {1}", name, lastLoginDate);
 		}
-
 
 		/// <summary>
 		/// This mimic classes in System.Data.Services.Internal.

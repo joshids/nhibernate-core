@@ -8,7 +8,7 @@ namespace NHibernate.Mapping.ByCode.Impl
 		public static string GetNhTypeName(this System.Type type)
 		{
 			string typeName;
-			IType nhType = TypeFactory.HeuristicType(type.AssemblyQualifiedName);
+			IType nhType = TypeFactory.HeuristicType(type);
 			if (nhType != null)
 			{
 				typeName = nhType.Name;
@@ -34,12 +34,12 @@ namespace NHibernate.Mapping.ByCode.Impl
 			string typeAssemblyFullName = type.Assembly.FullName;
 			string typeNameSpace = type.Namespace;
 			string assembly = null;
-			if (!typeAssembly.Equals(mapDoc.assembly) && !typeAssemblyFullName.Equals(mapDoc.assembly))
+			if (typeAssembly != mapDoc.assembly && typeAssemblyFullName != mapDoc.assembly)
 			{
 				assembly = typeAssembly;
 			}
 			string @namespace = null;
-			if (!typeNameSpace.Equals(mapDoc.@namespace))
+			if (typeNameSpace != mapDoc.@namespace)
 			{
 				@namespace = typeNameSpace;
 			}

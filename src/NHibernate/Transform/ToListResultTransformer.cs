@@ -5,13 +5,13 @@ using System.Collections.Generic;
 namespace NHibernate.Transform
 {
 	/// <summary> 
-	/// Tranforms each result row from a tuple into a <see cref="IList"/>, such that what
+	/// Transforms each result row from a tuple into a <see cref="IList"/>, such that what
 	/// you end up with is a <see cref="IList"/> of <see cref="IList"/>.
 	/// </summary>
 	[Serializable]
 	public class ToListResultTransformer : IResultTransformer
 	{
-		private static readonly object Hasher = new object();
+		internal static readonly ToListResultTransformer Instance = new ToListResultTransformer();
 
 		public object TransformTuple(object[] tuple, string[] aliases)
 		{
@@ -25,16 +25,16 @@ namespace NHibernate.Transform
 
 		public override bool Equals(object obj)
 		{
+			if (ReferenceEquals(obj, this))
+				return true;
 			if (obj == null)
-			{
 				return false;
-			}
-			return obj.GetHashCode() == Hasher.GetHashCode();
+			return obj.GetType() == GetType();
 		}
 
 		public override int GetHashCode()
 		{
-			return Hasher.GetHashCode();
+			return System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(Instance);
 		}
 	}
 }

@@ -11,7 +11,7 @@ namespace NHibernate.Test.NHSpecificTest.NH1837
 	{
 		protected override void OnSetUp()
 		{
-			sessions.Statistics.IsStatisticsEnabled = true;
+			Sfi.Statistics.IsStatisticsEnabled = true;
 			using(ISession session=this.OpenSession())
 			using(ITransaction tran=session.BeginTransaction())
 			{
@@ -37,8 +37,7 @@ namespace NHibernate.Test.NHSpecificTest.NH1837
 		[Test]
 		public void ExecutesOneQueryWithUniqueResultWithChildCriteriaNonGeneric()
 		{
-	
-			sessions.Statistics.Clear();
+			Sfi.Statistics.Clear();
 			using (ISession session = this.OpenSession())
 			{
 				var criteria = session.CreateCriteria(typeof(Order),"o");
@@ -46,13 +45,13 @@ namespace NHibernate.Test.NHSpecificTest.NH1837
 					.Add(Restrictions.Eq("c.Id", 1))
 					.SetProjection(Projections.RowCount())
 					.UniqueResult();
-				Assert.That(sessions.Statistics.QueryExecutionCount, Is.EqualTo(1));
+				Assert.That(Sfi.Statistics.QueryExecutionCount, Is.EqualTo(1));
 			}
 		}
 		[Test]
 		public void ExecutesOneQueryWithUniqueResultWithChildCriteriaGeneric()
 		{
-			sessions.Statistics.Clear();
+			Sfi.Statistics.Clear();
 			using (ISession session = this.OpenSession())
 			{
 				session.CreateCriteria(typeof (Order), "o")
@@ -60,32 +59,32 @@ namespace NHibernate.Test.NHSpecificTest.NH1837
 					.Add(Restrictions.Eq("c.Id", 1))
 					.SetProjection(Projections.RowCount())
 					.UniqueResult<int>();
-				Assert.That(sessions.Statistics.QueryExecutionCount, Is.EqualTo(1));
+				Assert.That(Sfi.Statistics.QueryExecutionCount, Is.EqualTo(1));
 			}
 		}
 		[Test]
 		public void ExecutesOneQueryWithUniqueResultWithCriteriaNonGeneric()
 		{
-			sessions.Statistics.Clear();
+			Sfi.Statistics.Clear();
 			using (ISession session = this.OpenSession())
 			{
 				session.CreateCriteria(typeof (Order), "o")
 					.SetProjection(Projections.RowCount())
 					.UniqueResult();
-				Assert.That(sessions.Statistics.QueryExecutionCount, Is.EqualTo(1));
+				Assert.That(Sfi.Statistics.QueryExecutionCount, Is.EqualTo(1));
 			}
 		}
 
 		[Test]
 		public void ExecutesOneQueryWithUniqueResultWithCriteriaGeneric()
 		{
-			sessions.Statistics.Clear();
+			Sfi.Statistics.Clear();
 			using (ISession session = this.OpenSession())
 			{
 				session.CreateCriteria(typeof (Order), "o")
 					.SetProjection(Projections.RowCount())
 					.UniqueResult<int>();
-				Assert.That(sessions.Statistics.QueryExecutionCount, Is.EqualTo(1));
+				Assert.That(Sfi.Statistics.QueryExecutionCount, Is.EqualTo(1));
 			}
 		}
 	}

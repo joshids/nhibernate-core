@@ -3,7 +3,6 @@ using System.Linq;
 using System.Collections.Generic;
 using NUnit.Framework;
 
-
 namespace NHibernate.Test.DialectTest.FunctionTests
 {
 	/// <summary>
@@ -16,7 +15,7 @@ namespace NHibernate.Test.DialectTest.FunctionTests
 		/// <summary>
 		/// Test case data source for DialectSupportingSequencesMustFullfillSequenceContract().
 		/// </summary>
-		private IEnumerable<System.Type> GetAllDialectTypes()
+		private static IEnumerable<System.Type> GetAllDialectTypes()
 		{
 			var dialectBaseType = typeof(NHibernate.Dialect.Dialect);
 
@@ -25,8 +24,7 @@ namespace NHibernate.Test.DialectTest.FunctionTests
 				.ToList();
 		}
 
-
-		[TestCaseSource("GetAllDialectTypes")]
+		[TestCaseSource(nameof(GetAllDialectTypes))]
 		public void DialectSupportingSequencesMustFullfillSequenceContract(System.Type dialectType)
 		{
 			var dialect = (NHibernate.Dialect.Dialect)Activator.CreateInstance(dialectType);
@@ -48,7 +46,6 @@ namespace NHibernate.Test.DialectTest.FunctionTests
 			dialect.GetSelectSequenceNextValString("foo");
 			dialect.GetSequenceNextValString("foo");
 			var sql = dialect.QuerySequencesString;
-
 		}
 	}
 }

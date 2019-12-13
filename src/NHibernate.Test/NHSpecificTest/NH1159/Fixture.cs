@@ -9,7 +9,6 @@ namespace NHibernate.Test.NHSpecificTest.NH1159
 	[TestFixture]
 	public class Fixture:BugTestCase
 	{
-
 		protected override void  OnSetUp()
 		{
 			using (ISession session = OpenSession())
@@ -20,8 +19,7 @@ namespace NHibernate.Test.NHSpecificTest.NH1159
 				tran.Commit();
 			}
 			HibernateInterceptor.CallCount = 0;
-
-        }
+		}
 
 		protected override void OnTearDown()
 		{
@@ -69,7 +67,7 @@ namespace NHibernate.Test.NHSpecificTest.NH1159
 			using (ISession session = OpenSession(new HibernateInterceptor()))
 			using (ITransaction tran = session.BeginTransaction())
 			{
-				session.FlushMode = FlushMode.Never;
+				session.FlushMode = FlushMode.Manual;
 				Assert.That(HibernateInterceptor.CallCount, Is.EqualTo(0));
 				Contact contact = session.Get<Contact>((Int64)1);
 				contact.PreferredName = "Updated preferred name";

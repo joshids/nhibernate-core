@@ -19,7 +19,7 @@ namespace NHibernate.Hql.Ast.ANTLR.Tree
 	[CLSCompliant(false)]
 	public class FromElementType
 	{
-		private static readonly IInternalLogger Log = LoggerProvider.LoggerFor(typeof(FromElementType));
+		private static readonly INHibernateLogger Log = NHibernateLogger.For(typeof(FromElementType));
 
 		private readonly FromElement _fromElement;
 		private readonly IEntityPersister _persister;
@@ -189,7 +189,6 @@ namespace NHibernate.Hql.Ast.ANTLR.Tree
 			return buf.ToString();
 		}
 
-
 		/// <summary>
 		/// Returns the property select SQL fragment.
 		/// </summary>
@@ -199,13 +198,27 @@ namespace NHibernate.Hql.Ast.ANTLR.Tree
 		/// <returns>the property select SQL fragment.</returns>
 		public string RenderPropertySelect(int size, int k, bool allProperties)
 		{
+			return RenderPropertySelect(size, k, null, allProperties);
+		}
+
+		public string RenderPropertySelect(int size, int k, string[] fetchLazyProperties)
+		{
+			return RenderPropertySelect(size, k, fetchLazyProperties, false);
+		}
+
+		private string RenderPropertySelect(int size, int k, string[] fetchLazyProperties, bool allProperties)
+		{
 			CheckInitialized();
 
 			var queryable = Queryable;
 			if (queryable == null)
 				return "";
 
-			string fragment = queryable.PropertySelectFragment(TableAlias, GetSuffix(size, k), allProperties);
+			// Use the old method when fetchProperties is null to prevent any breaking changes
+			// 6.0 TODO: simplify condition by removing the fetchProperties part
+			string fragment = fetchLazyProperties == null || allProperties
+				? queryable.PropertySelectFragment(TableAlias, GetSuffix(size, k), allProperties)
+				: queryable.PropertySelectFragment(TableAlias, GetSuffix(size, k), fetchLazyProperties);
 
 			return TrimLeadingCommaAndSpaces(fragment);
 		}
@@ -373,9 +386,9 @@ namespace NHibernate.Hql.Ast.ANTLR.Tree
 						enabledFilters,
 						propertyMapping.ToColumns(tableAlias, path)
 				);
-				if (Log.IsDebugEnabled)
+				if (Log.IsDebugEnabled())
 				{
-					Log.Debug("toColumns(" + tableAlias + "," + path + ") : subquery = " + subquery);
+					Log.Debug("toColumns({0},{1}) : subquery = {2}", tableAlias, path, subquery);
 				}
 				return new [] { "(" + subquery + ")" };
 			}
@@ -427,7 +440,7 @@ namespace NHibernate.Hql.Ast.ANTLR.Tree
 				else
 				{
 					string[] columns = propertyMapping.ToColumns(path);
-					Log.Info("Using non-qualified column reference [" + path + " -> (" + ArrayHelper.ToString(columns) + ")]");
+					Log.Info("Using non-qualified column reference [{0} -> ({1})]", path, ArrayHelper.ToString(columns));
 					return columns;
 				}
 			}

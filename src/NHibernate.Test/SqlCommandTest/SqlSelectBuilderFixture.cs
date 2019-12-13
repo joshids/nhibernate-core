@@ -8,7 +8,7 @@ using NUnit.Framework;
 namespace NHibernate.Test.SqlCommandTest
 {
 	/// <summary>
-	/// Tests all of the functionallity of the SqlSelectBuilderTest
+	/// Tests all of the functionality of the SqlSelectBuilderTest
 	/// </summary>
 	[TestFixture]
 	public class SqlSelectBuilderFixture
@@ -43,7 +43,6 @@ namespace NHibernate.Test.SqlCommandTest
 				.Append("select_test_alias.identity_column = ? ")
 				.Append("ORDER BY column1 DESC")
 				.ToString();
-
 
 			Assert.AreEqual(expectedSql, sqlString.ToString(), "SQL String");
 			Assert.AreEqual(1, sqlString.GetParameterCount(), "One parameter");

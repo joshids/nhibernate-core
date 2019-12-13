@@ -20,7 +20,6 @@ namespace NHibernate
 
 		public ADOException()
 		{
-			
 		}
 		/// <summary>
 		/// Initializes a new instance of the <see cref="ADOException"/> class.
@@ -56,11 +55,7 @@ namespace NHibernate
 			this.sql = (string) info.GetValue("sql", typeof(string));
 		}
 
-#if NET_4_0
 		[SecurityCritical]
-#else
-		[SecurityPermission(SecurityAction.LinkDemand, Flags=SecurityPermissionFlag.SerializationFormatter)]
-#endif
 		public override void GetObjectData(SerializationInfo info, StreamingContext context)
 		{
 			base.GetObjectData(info, context);

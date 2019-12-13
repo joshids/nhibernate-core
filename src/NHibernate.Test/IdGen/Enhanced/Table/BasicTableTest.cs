@@ -7,7 +7,7 @@ namespace NHibernate.Test.IdGen.Enhanced.Table
 	[TestFixture]
 	public class BasicTableTest : TestCase
 	{
-		protected override IList Mappings
+		protected override string[] Mappings
 		{
 			get { return new[] { "IdGen.Enhanced.Table.Basic.hbm.xml" }; }
 		}
@@ -17,11 +17,10 @@ namespace NHibernate.Test.IdGen.Enhanced.Table
 			get { return "NHibernate.Test"; }
 		}
 
-
 		[Test]
 		public void TestNormalBoundary()
 		{
-			var persister = sessions.GetEntityPersister(typeof(Entity).FullName);
+			var persister = Sfi.GetEntityPersister(typeof(Entity).FullName);
 			Assert.That(persister.IdentifierGenerator, Is.TypeOf<TableGenerator>());
 
 			var generator = (TableGenerator)persister.IdentifierGenerator;
@@ -41,11 +40,9 @@ namespace NHibernate.Test.IdGen.Enhanced.Table
 						Assert.That(entities[i].Id, Is.EqualTo(expectedId));
 						Assert.That(generator.TableAccessCount, Is.EqualTo(expectedId));
 						Assert.That(generator.Optimizer.LastSourceValue, Is.EqualTo(expectedId));
-
 					}
 					transaction.Commit();
 				}
-
 
 				using (ITransaction transaction = s.BeginTransaction())
 				{

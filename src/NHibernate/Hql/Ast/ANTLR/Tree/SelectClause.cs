@@ -25,6 +25,7 @@ namespace NHibernate.Hql.Ast.ANTLR.Tree
 		private readonly List<FromElement> _fromElementsForLoad = new List<FromElement>();
 		private ConstructorNode _constructorNode;
 		private string[] _aliases;
+		private int[] _columnNamesStartPositions;
 
 		public static bool VERSION2_SQL;
 
@@ -32,7 +33,6 @@ namespace NHibernate.Hql.Ast.ANTLR.Tree
 			: base(token)
 		{
 		}
-
 
 		/// <summary>
 		/// Prepares a derived (i.e., not explicitly defined in the query) select clause.
@@ -50,7 +50,7 @@ namespace NHibernate.Hql.Ast.ANTLR.Tree
 			//			// NOTE : the isSubQuery() bit is a temporary hack...
 			//			throw new QuerySyntaxException( "JPA-QL compliance requires select clause" );
 			//		}
-			IList<IASTNode> fromElements = fromClause.GetProjectionList();
+			var fromElements = fromClause.GetProjectionListTyped();
 
 			ASTAppender appender = new ASTAppender(ASTFactory, this);	// Get ready to start adding nodes.
 			int size = fromElements.Count;
@@ -105,7 +105,6 @@ namespace NHibernate.Hql.Ast.ANTLR.Tree
 
 			FinishInitialization( /*sqlResultTypeList,*/ queryReturnTypeList);
 		}
-
 
 		/// <summary>
 		/// Prepares an explicitly defined select clause.
@@ -181,7 +180,7 @@ namespace NHibernate.Hql.Ast.ANTLR.Tree
 			if (!Walker.IsShallowQuery)
 			{
 				// add the fetched entities
-				IList<IASTNode> fromElements = fromClause.GetProjectionList();
+				var fromElements = fromClause.GetProjectionListTyped();
 
 				ASTAppender appender = new ASTAppender(ASTFactory, this);	// Get ready to start adding nodes.
 				int size = fromElements.Count;
@@ -207,7 +206,6 @@ namespace NHibernate.Hql.Ast.ANTLR.Tree
 						}
 						else
 						{
-
 							IType type = fromElement.SelectType;
 							AddCollectionFromElement(fromElement);
 
@@ -463,7 +461,7 @@ namespace NHibernate.Hql.Ast.ANTLR.Tree
 				for (int i = 0; i < se.Length; i++)
 				{
 					ISelectExpression expr = se[i];
-					expr.SetScalarColumnText(i);	// Create SQL_TOKEN nodes for the columns.
+					expr.SetScalarColumn(i);	// Create SQL_TOKEN nodes for the columns.
 				}
 			}
 		}
@@ -506,7 +504,18 @@ namespace NHibernate.Hql.Ast.ANTLR.Tree
 
 			// todo: we should really just collect these from the various SelectExpressions, rather than regenerating here
 			_columnNames = SessionFactoryHelper.GenerateColumnNames(_queryReturnTypes);
+			_columnNamesStartPositions = new int[_columnNames.Length];
+			int startPosition = 1;
+			for (int i = 0; i < _columnNames.Length; i++)
+			{
+				_columnNamesStartPositions[i] = startPosition;
+				startPosition += _columnNames[i].Length;
+			}
 		}
 
+		public int GetColumnNamesStartPosition(int i)
+		{
+			return _columnNamesStartPositions[i];
+		}
 	}
 }

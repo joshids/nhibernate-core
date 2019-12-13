@@ -21,18 +21,18 @@ namespace NHibernate.Hql.Ast.ANTLR.Tree
 			get { return HqlSqlWalker.INSERT; }
 		}
 
-		/// <summary> Retreive this insert statement's into-clause. </summary>
+		/// <summary> Retrieve this insert statement's into-clause. </summary>
 		/// <returns> The into-clause </returns>
 		public IntoClause IntoClause
 		{
-			get{return (IntoClause)GetFirstChild();}
+			get{return (IntoClause)GetFirstChild(); }
 		}
 
-		/// <summary> Retreive this insert statement's select-clause.</summary>
+		/// <summary> Retrieve this insert statement's select-clause.</summary>
 		/// <returns> The select-clause. </returns>
 		public SelectClause SelectClause
 		{
-			get{return ((QueryNode)IntoClause.NextSibling).GetSelectClause();}
+			get{return ((QueryNode)IntoClause.NextSibling).GetSelectClause(); }
 		}
 
 		/// <summary> Performs detailed semantic validation on this insert statement tree. </summary>

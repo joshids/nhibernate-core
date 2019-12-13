@@ -1,4 +1,5 @@
 ﻿using System.Linq;
+using NHibernate.Dialect;
 using NHibernate.Linq;
 using NUnit.Framework;
 
@@ -7,6 +8,13 @@ namespace NHibernate.Test.NHSpecificTest.NH3332
 	[TestFixture]
 	public class TestJoinsWithSameTable : BugTestCase
 	{
+		protected override bool AppliesTo(Dialect.Dialect dialect)
+		{
+			// This test uses a version mapping corresponding to SLQ Server timestamp, where the type is not
+			// a datetime but an incremented binary int.
+			return Dialect is MsSql2000Dialect;
+		}
+
 		protected override void OnSetUp()
 		{
 			using (var session = OpenSession())
@@ -63,12 +71,10 @@ namespace NHibernate.Test.NHSpecificTest.NH3332
 			}
 		}
 
-
 		private void CreateObjects(ISession session)
 		{
 			// Create the English culture
 			Culture englishCulture = new Culture();
-
 
 			englishCulture.CountryCode = "CA";
 			englishCulture.LanguageCode = "en";
@@ -96,8 +102,6 @@ namespace NHibernate.Test.NHSpecificTest.NH3332
 
 			dataType1.DataTypeDescriptions.Add(dataTypeDescription1);
 
-
-
 			// Create a State and attach it an English description and a Spanish description
 
 			State state1 = new State();
@@ -116,7 +120,6 @@ namespace NHibernate.Test.NHSpecificTest.NH3332
 			//      spanishStateDescription.Description = "Development - Spanish";
 
 			state1.StateDescriptions.Add(spanishStateDescription);
-
 
 			MasterEntity masterEntity = new MasterEntity();
 

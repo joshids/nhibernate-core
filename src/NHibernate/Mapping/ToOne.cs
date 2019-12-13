@@ -14,7 +14,6 @@ namespace NHibernate.Mapping
 		private bool lazy = true;
 		internal string referencedPropertyName;
 		private string referencedEntityName;
-		private bool embedded;
 		private bool unwrapProxy;
 
 		/// <summary>
@@ -50,12 +49,6 @@ namespace NHibernate.Mapping
 			set { lazy = value; }
 		}
 
-		public bool Embedded
-		{
-			get { return embedded; }
-			set { embedded = value; }
-		}
-
 		/// <summary>
 		/// 
 		/// </summary>
@@ -79,7 +72,7 @@ namespace NHibernate.Mapping
 			return base.IsValid(mapping);
 		}
 
-		public override abstract IType Type { get;}
+		public override abstract IType Type { get; }
 
 		public override bool IsTypeSpecified
 		{

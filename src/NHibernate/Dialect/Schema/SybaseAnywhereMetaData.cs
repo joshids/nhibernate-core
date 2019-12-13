@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
 
-
 namespace NHibernate.Dialect.Schema
 {
 	// Metadata for connections using the iAnywhere.Data.SQLAnywhere ADO.NET provider
@@ -18,7 +17,7 @@ namespace NHibernate.Dialect.Schema
 
 		public override ISet<string> GetReservedWords()
 		{
-			var result = new HashSet<string>();
+			var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 			DataTable dtReservedWords = Connection.GetSchema(DbMetaDataCollectionNames.ReservedWords);
 			foreach (DataRow row in dtReservedWords.Rows)
 			{

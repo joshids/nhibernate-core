@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
-using System.Linq;
 using NHibernate.Engine;
 using NHibernate.Hql.Ast.ANTLR.Tree;
+using NHibernate.Util;
 
 namespace NHibernate.Hql.Ast.ANTLR
 {
@@ -14,11 +14,6 @@ namespace NHibernate.Hql.Ast.ANTLR
 	/// </summary>
 	public class ASTQueryTranslatorFactory : IQueryTranslatorFactory
 	{
-		public IQueryTranslator[] CreateQueryTranslators(string queryString, string collectionRole, bool shallow, IDictionary<string, IFilter> filters, ISessionFactoryImplementor factory)
-		{
-			return CreateQueryTranslators(queryString.ToQueryExpression(), collectionRole, shallow, filters, factory);
-		}
-
 		public IQueryTranslator[] CreateQueryTranslators(IQueryExpression queryExpression, string collectionRole, bool shallow, IDictionary<string, IFilter> filters, ISessionFactoryImplementor factory)
 		{
 			return CreateQueryTranslators(queryExpression.Translate(factory, collectionRole != null), queryExpression.Key, collectionRole, shallow, filters, factory);
@@ -29,8 +24,7 @@ namespace NHibernate.Hql.Ast.ANTLR
 			var polymorphicParsers = AstPolymorphicProcessor.Process(ast, factory);
 
 			var translators = polymorphicParsers
-							.Select(hql => new QueryTranslatorImpl(queryIdentifier, hql, filters, factory))
-							.ToArray();
+				.ToArray(hql => new QueryTranslatorImpl(queryIdentifier, hql, filters, factory));
 
 			foreach (var translator in translators)
 			{
@@ -45,7 +39,6 @@ namespace NHibernate.Hql.Ast.ANTLR
 			}
 
 			return translators;
-			
 		}
 	}
 }

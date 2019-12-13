@@ -4,7 +4,10 @@ namespace NHibernate.Test.Hql.Ast
 {
 	public class KeyManyToOneEntity
 	{
+		// Used by reflection
+#pragma warning disable CS0169 // The field is never used
 		private Id id;
+#pragma warning restore CS0169 // The field is never used
 		private string name;
 
 		public virtual string Name
@@ -34,7 +37,6 @@ namespace NHibernate.Test.Hql.Ast
 
 				this.key1 = key1;
 				this.key2 = key2;
-
 			}
 
 			public virtual KeyManyToOneKeyEntity Key1

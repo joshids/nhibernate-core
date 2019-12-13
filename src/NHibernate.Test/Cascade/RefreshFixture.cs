@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Data;
+using System.Data.Common;
 using NUnit.Framework;
 
 namespace NHibernate.Test.Cascade
@@ -13,7 +14,7 @@ namespace NHibernate.Test.Cascade
 			get { return "NHibernate.Test"; }
 		}
 
-		protected override IList Mappings
+		protected override string[] Mappings
 		{
 			get { return new[] { "Cascade.Job.hbm.xml", "Cascade.JobBatch.hbm.xml" }; }
 		}
@@ -51,8 +52,8 @@ namespace NHibernate.Test.Cascade
 
 		private void UpdateStatuses(ISession session)
 		{
-			IDbConnection conn = session.Connection;
-			IDbCommand cmd = conn.CreateCommand();
+			var conn = session.Connection;
+			var cmd = conn.CreateCommand();
 			cmd.CommandText = "UPDATE T_JOB SET JOB_STATUS = 1";
 			cmd.CommandType = CommandType.Text;
 			session.Transaction.Enlist(cmd);
@@ -82,7 +83,6 @@ namespace NHibernate.Test.Cascade
 			{
 				using (ITransaction txn = session.BeginTransaction())
 				{
-
 					var batch = new JobBatch(DateTime.Now);
 					batch.CreateJob().ProcessingInstructions = "Just do it!";
 					session.Persist(batch);
@@ -115,6 +115,5 @@ namespace NHibernate.Test.Cascade
 				session.Close();
 			}
 		}
-
 	}
 }

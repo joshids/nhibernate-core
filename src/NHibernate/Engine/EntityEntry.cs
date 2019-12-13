@@ -24,7 +24,6 @@ namespace NHibernate.Engine
 		[NonSerialized]
 		private IEntityPersister persister; // for convenience to save some lookups
 
-		private readonly EntityMode entityMode;
 		private readonly string entityName;
 		private EntityKey cachedEntityKey;
 		private readonly bool isBeingReplicated;
@@ -44,12 +43,33 @@ namespace NHibernate.Engine
 		/// <param name="lockMode">The <see cref="LockMode"/> for the Entity.</param>
 		/// <param name="existsInDatabase">A boolean indicating if the Entity exists in the database.</param>
 		/// <param name="persister">The <see cref="IEntityPersister"/> that is responsible for this Entity.</param>
-		/// <param name="entityMode"></param>
 		/// <param name="disableVersionIncrement"></param>
 		/// <param name="lazyPropertiesAreUnfetched"></param>
+		// Since 5.3
+		[Obsolete("Use the constructor without lazyPropertiesAreUnfetched parameter")]
 		internal EntityEntry(Status status, object[] loadedState, object rowId, object id, object version, LockMode lockMode,
-			bool existsInDatabase, IEntityPersister persister, EntityMode entityMode,
-			bool disableVersionIncrement, bool lazyPropertiesAreUnfetched)
+		                     bool existsInDatabase, IEntityPersister persister,
+		                     bool disableVersionIncrement, bool lazyPropertiesAreUnfetched)
+			:this(status, loadedState, rowId, id, version, lockMode, existsInDatabase, persister, disableVersionIncrement)
+		{
+			loadedWithLazyPropertiesUnfetched = lazyPropertiesAreUnfetched;
+		}
+
+		/// <summary>
+		/// Initializes a new instance of EntityEntry.
+		/// </summary>
+		/// <param name="status">The current <see cref="Status"/> of the Entity.</param>
+		/// <param name="loadedState">The snapshot of the Entity's state when it was loaded.</param>
+		/// <param name="rowId"></param>
+		/// <param name="id">The identifier of the Entity in the database.</param>
+		/// <param name="version">The version of the Entity.</param>
+		/// <param name="lockMode">The <see cref="LockMode"/> for the Entity.</param>
+		/// <param name="existsInDatabase">A boolean indicating if the Entity exists in the database.</param>
+		/// <param name="persister">The <see cref="IEntityPersister"/> that is responsible for this Entity.</param>
+		/// <param name="disableVersionIncrement"></param>
+		internal EntityEntry(Status status, object[] loadedState, object rowId, object id, object version, LockMode lockMode,
+			bool existsInDatabase, IEntityPersister persister,
+			bool disableVersionIncrement)
 		{
 			this.status = status;
 			this.previousStatus = null;
@@ -61,9 +81,7 @@ namespace NHibernate.Engine
 			this.version = version;
 			this.lockMode = lockMode;
 			isBeingReplicated = disableVersionIncrement;
-			loadedWithLazyPropertiesUnfetched = lazyPropertiesAreUnfetched;
 			this.persister = persister;
-			this.entityMode = entityMode;
 			entityName = persister == null ? null : persister.EntityName;
 		}
 
@@ -183,6 +201,8 @@ namespace NHibernate.Engine
 			get { return rowId; }
 		}
 
+		// Since 5.3
+		[Obsolete("This property is not used and will be removed in a future version.")]
 		public bool LoadedWithLazyPropertiesUnfetched
 		{
 			get { return loadedWithLazyPropertiesUnfetched; }
@@ -200,7 +220,7 @@ namespace NHibernate.Engine
 					if (id == null)
 						throw new InvalidOperationException("cannot generate an EntityKey when id is null.");
 
-					cachedEntityKey = new EntityKey(id, persister, entityMode);
+					cachedEntityKey = new EntityKey(id, persister);
 				}
 				return cachedEntityKey;
 			}
@@ -234,9 +254,13 @@ namespace NHibernate.Engine
 			if (Persister.IsVersioned)
 			{
 				version = nextVersion;
-				Persister.SetPropertyValue(entity, Persister.VersionProperty, nextVersion, entityMode);
+				Persister.SetPropertyValue(entity, Persister.VersionProperty, nextVersion);
 			}
-			FieldInterceptionHelper.ClearDirty(entity);
+
+			if (Persister.IsInstrumented)
+			{
+				persister.EntityMetamodel.BytecodeEnhancementMetadata.ExtractInterceptor(entity)?.ClearDirty();
+			}
 		}
 
 		/// <summary>
@@ -255,7 +279,7 @@ namespace NHibernate.Engine
 			version = nextVersion;
 			loadedState[persister.VersionProperty] = version;
 			LockMode = LockMode.Force;
-			persister.SetPropertyValue(entity, Persister.VersionProperty, nextVersion, entityMode);
+			persister.SetPropertyValue(entity, Persister.VersionProperty, nextVersion);
 		}
 		
 		public bool IsNullifiable(bool earlyInsert, ISessionImplementor session)
@@ -267,8 +291,8 @@ namespace NHibernate.Engine
 		{
 			return
 				IsModifiableEntity()
-				&& (Persister.HasMutableProperties || !FieldInterceptionHelper.IsInstrumented(entity)
-				|| FieldInterceptionHelper.ExtractFieldInterceptor(entity).IsDirty);
+				&& (Persister.HasMutableProperties || !Persister.IsInstrumented
+				|| (Persister.EntityMetamodel.BytecodeEnhancementMetadata.ExtractInterceptor(entity)?.IsDirty ?? true));
 		}
 		
 		/// <summary>
@@ -312,7 +336,7 @@ namespace NHibernate.Engine
 					throw new InvalidOperationException("Cannot make an immutable entity modifiable.");
 
 				Status = Status.Loaded;
-				loadedState = Persister.GetPropertyValues(entity, entityMode);
+				loadedState = Persister.GetPropertyValues(entity);
 			}
 		}
 

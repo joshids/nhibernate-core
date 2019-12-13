@@ -43,7 +43,7 @@ namespace NHibernate.Tuple
 		/// Need to determine how to best handle this for the Tuplizers for EntityModes
 		/// other than POCO.
 		/// </remarks>
-		System.Type MappedClass { get;}
+		System.Type MappedClass { get; }
 
 		/// <summary> 
 		/// Extract the current values contained on the given entity. 
@@ -69,7 +69,7 @@ namespace NHibernate.Tuple
 		object Instantiate();
 
 		/// <summary> 
-		/// Is the given object considered an instance of the the entity (acconting
+		/// Is the given object considered an instance of the the entity (accounting
 		/// for entity-mode) managed by this tuplizer. 
 		/// </summary>
 		/// <param name="obj">The object to be checked. </param>

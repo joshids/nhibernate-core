@@ -16,6 +16,6 @@ namespace NHibernate.Mapping.ByCode
 		void Unique(bool unique);
 	}
 
-	public interface IDynamicComponentMapper<TComponent> : IDynamicComponentAttributesMapper<TComponent>, IPropertyContainerMapper<TComponent> where TComponent : class { }
-
+	public interface IDynamicComponentMapper<TComponent> : IDynamicComponentAttributesMapper<TComponent>, IPropertyContainerMapper<TComponent>
+	{ }
 }

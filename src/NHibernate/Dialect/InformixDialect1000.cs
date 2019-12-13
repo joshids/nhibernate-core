@@ -1,4 +1,3 @@
-using System.Data;
 using NHibernate.Cfg;
 using NHibernate.Dialect.Function;
 using NHibernate.SqlCommand;
@@ -7,7 +6,6 @@ using NHibernate.Exceptions;
 using NHibernate.Util;
 //using NHibernate.Dialect.Schema;
 using Environment = NHibernate.Cfg.Environment;
-
 
 namespace NHibernate.Dialect
 {

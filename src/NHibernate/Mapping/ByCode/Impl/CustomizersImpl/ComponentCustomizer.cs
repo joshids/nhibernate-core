@@ -5,7 +5,6 @@ using System.Reflection;
 namespace NHibernate.Mapping.ByCode.Impl.CustomizersImpl
 {
 	public class ComponentCustomizer<TComponent> : PropertyContainerCustomizer<TComponent>, IComponentMapper<TComponent>, IConformistHoldersProvider
-		where TComponent : class
 	{
 		public ComponentCustomizer(IModelExplicitDeclarationsHolder explicitDeclarationsHolder, ICustomizersHolder customizersHolder)
 			: base(explicitDeclarationsHolder, customizersHolder, null)
@@ -38,6 +37,12 @@ namespace NHibernate.Mapping.ByCode.Impl.CustomizersImpl
 			Parent(parent, x => { });
 		}
 
+		public void Parent(string notVisiblePropertyOrFieldName, Action<IComponentParentMapper> parentMapping)
+		{
+			MemberInfo member = GetRequiredPropertyOrFieldByName(notVisiblePropertyOrFieldName);
+			AddCustomizer(m => m.Parent(member, parentMapping));
+		}
+
 		public void Parent<TProperty>(Expression<Func<TComponent, TProperty>> parent, Action<IComponentParentMapper> parentMapping) where TProperty : class
 		{
 			MemberInfo member = TypeExtensions.DecodeMemberAccessExpression(parent);
@@ -57,6 +62,11 @@ namespace NHibernate.Mapping.ByCode.Impl.CustomizersImpl
 		public void Lazy(bool isLazy)
 		{
 			AddCustomizer(m => m.Lazy(isLazy));
+		}
+
+		public void LazyGroup(string name)
+		{
+			AddCustomizer(m => m.LazyGroup(name));
 		}
 
 		public void Unique(bool unique)

@@ -7,7 +7,6 @@ using NUnit.Framework;
 
 namespace NHibernate.Test.CfgTest
 {
-
 	#region Classes used by the mappings defined in the Dynamic Assembly
 
 	public class A
@@ -132,36 +131,36 @@ namespace NHibernate.Test.CfgTest
 
 		#region NUnit.Framework.TestFixture Members
 
-		[TestFixtureSetUp]
+		[OneTimeSetUp]
 		public void TestFixtureSetUp()
 		{
-			dir_ = Directory.GetCurrentDirectory();
+			dir_ = TestContext.CurrentContext.TestDirectory;
 
 			// Create hbm files (ideally, we could just embed them directly into the
 			// assembly - same as VS does when 'Build Action' = 'Embedded Resource' - but
 			// I could not find a way to do this, so we use files instead)
 
-			StreamWriter aw = new StreamWriter("A.hbm.xml");
+			StreamWriter aw = new StreamWriter(Path.Combine(dir_, "A.hbm.xml"));
 			aw.Write(aJoinedHbmXml);
 			aw.Close();
 
-			StreamWriter bw = new StreamWriter("B.hbm.xml");
+			StreamWriter bw = new StreamWriter(Path.Combine(dir_, "B.hbm.xml"));
 			bw.Write(bJoinedHbmXml);
 			bw.Close();
 
-			StreamWriter cw = new StreamWriter("C.hbm.xml");
+			StreamWriter cw = new StreamWriter(Path.Combine(dir_, "C.hbm.xml"));
 			cw.Write(cJoinedHbmXml);
 			cw.Close();
 
-			StreamWriter asw = new StreamWriter("A.subclass.hbm.xml");
+			StreamWriter asw = new StreamWriter(Path.Combine(dir_, "A.subclass.hbm.xml"));
 			asw.Write(aJoinedHbmXml);
 			asw.Close();
 
-			StreamWriter bsw = new StreamWriter("B.subclass.hbm.xml");
+			StreamWriter bsw = new StreamWriter(Path.Combine(dir_, "B.subclass.hbm.xml"));
 			bsw.Write(bJoinedHbmXml);
 			bsw.Close();
 
-			StreamWriter csw = new StreamWriter("C.subclass.hbm.xml");
+			StreamWriter csw = new StreamWriter(Path.Combine(dir_, "C.subclass.hbm.xml"));
 			csw.Write(cJoinedHbmXml);
 			csw.Close();
 		}
@@ -176,7 +175,7 @@ namespace NHibernate.Test.CfgTest
 		{
 		}
 
-		[TestFixtureTearDown]
+		[OneTimeTearDown]
 		public virtual void TestFixtureTearDown()
 		{
 		}
@@ -189,7 +188,7 @@ namespace NHibernate.Test.CfgTest
 			AssemblyName assemblyName = new AssemblyName();
 			assemblyName.Name = "MyTestA.dll";
 			AssemblyBuilder assemblyBuilder =
-				AppDomain.CurrentDomain.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.RunAndSave);
+				AppDomain.CurrentDomain.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.RunAndSave, dir_);
 			ModuleBuilder moduleBuilder = assemblyBuilder.DefineDynamicModule(assemblyName.Name, assemblyName.Name, true);
 			assemblyBuilder.AddResourceFile("A.hbm.xml", "A.hbm.xml");
 			assemblyBuilder.AddResourceFile("B.hbm.xml", "B.hbm.xml");
@@ -197,7 +196,7 @@ namespace NHibernate.Test.CfgTest
 			assemblyBuilder.Save(assemblyName.Name);
 
 			Configuration cfg = new Configuration();
-			cfg.AddAssembly(Assembly.LoadFile(dir_ + "/" + assemblyName.Name));
+			cfg.AddAssembly(Assembly.LoadFile(Path.Combine(dir_, assemblyName.Name)));
 			// if no exception, success
 		}
 
@@ -207,7 +206,7 @@ namespace NHibernate.Test.CfgTest
 			AssemblyName assemblyName = new AssemblyName();
 			assemblyName.Name = "MyTestB.dll";
 			AssemblyBuilder assemblyBuilder =
-				AppDomain.CurrentDomain.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.RunAndSave);
+				AppDomain.CurrentDomain.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.RunAndSave, dir_);
 			ModuleBuilder moduleBuilder = assemblyBuilder.DefineDynamicModule(assemblyName.Name, assemblyName.Name, true);
 			assemblyBuilder.AddResourceFile("C.hbm.xml", "C.hbm.xml");
 			assemblyBuilder.AddResourceFile("B.hbm.xml", "B.hbm.xml");
@@ -215,7 +214,7 @@ namespace NHibernate.Test.CfgTest
 			assemblyBuilder.Save(assemblyName.Name);
 
 			Configuration cfg = new Configuration();
-			cfg.AddAssembly(Assembly.LoadFile(dir_ + "/" + assemblyName.Name));
+			cfg.AddAssembly(Assembly.LoadFile(Path.Combine(dir_, assemblyName.Name)));
 			// if no exception, success
 		}
 
@@ -225,7 +224,7 @@ namespace NHibernate.Test.CfgTest
 			AssemblyName assemblyName = new AssemblyName();
 			assemblyName.Name = "MyTestC.dll";
 			AssemblyBuilder assemblyBuilder =
-				AppDomain.CurrentDomain.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.RunAndSave);
+				AppDomain.CurrentDomain.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.RunAndSave, dir_);
 			ModuleBuilder moduleBuilder = assemblyBuilder.DefineDynamicModule(assemblyName.Name, assemblyName.Name, true);
 			assemblyBuilder.AddResourceFile("B.hbm.xml", "B.hbm.xml");
 			assemblyBuilder.AddResourceFile("A.hbm.xml", "A.hbm.xml");
@@ -233,7 +232,7 @@ namespace NHibernate.Test.CfgTest
 			assemblyBuilder.Save(assemblyName.Name);
 
 			Configuration cfg = new Configuration();
-			cfg.AddAssembly(Assembly.LoadFile(dir_ + "/" + assemblyName.Name));
+			cfg.AddAssembly(Assembly.LoadFile(Path.Combine(dir_, assemblyName.Name)));
 			// if no exception, success
 		}
 
@@ -243,7 +242,7 @@ namespace NHibernate.Test.CfgTest
 			AssemblyName assemblyName = new AssemblyName();
 			assemblyName.Name = "MyTestCSubclass.dll";
 			AssemblyBuilder assemblyBuilder =
-				AppDomain.CurrentDomain.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.RunAndSave);
+				AppDomain.CurrentDomain.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.RunAndSave, dir_);
 			ModuleBuilder moduleBuilder = assemblyBuilder.DefineDynamicModule(assemblyName.Name, assemblyName.Name, true);
 			assemblyBuilder.AddResourceFile("B.subclass.hbm.xml", "B.hbm.xml");
 			assemblyBuilder.AddResourceFile("A.subclass.hbm.xml", "A.hbm.xml");
@@ -251,7 +250,7 @@ namespace NHibernate.Test.CfgTest
 			assemblyBuilder.Save(assemblyName.Name);
 
 			Configuration cfg = new Configuration();
-			cfg.AddAssembly(Assembly.LoadFile(dir_ + "/" + assemblyName.Name));
+			cfg.AddAssembly(Assembly.LoadFile(Path.Combine(dir_, assemblyName.Name)));
 			// if no exception, success
 		}
 	}

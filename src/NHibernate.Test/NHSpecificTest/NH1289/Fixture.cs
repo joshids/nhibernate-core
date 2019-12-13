@@ -5,7 +5,7 @@ using NUnit.Framework;
 
 namespace NHibernate.Test.NHSpecificTest.NH1289
 {
-	[TestFixture,Ignore]
+	[TestFixture, Ignore("Not fixed yet.")]
 	public class Fixture:BugTestCase
 	{
 		protected override void OnSetUp()
@@ -26,7 +26,6 @@ namespace NHibernate.Test.NHSpecificTest.NH1289
 				              		ImageName = "abc"
 				              	};
 
-
 				var purchaseItem = new Cons_PurchaseItem
 				                   	{
 				                   		Product = product,
@@ -39,9 +38,8 @@ namespace NHibernate.Test.NHSpecificTest.NH1289
 
 				tran.Commit();
 			}
-				
-			
 		}
+		
 		protected override void OnTearDown()
 		{
 			using (var ses = OpenSession())

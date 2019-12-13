@@ -1,5 +1,3 @@
-using System.Collections;
-
 namespace NHibernate.Test.NHSpecificTest.NH1502
 {
 	public class Person
@@ -7,12 +5,10 @@ namespace NHibernate.Test.NHSpecificTest.NH1502
 		private int id;
 		private int iq;
 		private string name;
-		private IList pets;
 		private int shoeSize;
 
 		public Person()
 		{
-			pets = new ArrayList();
 		}
 
 		public Person(string name, int iq, int shoeSize)
@@ -20,7 +16,6 @@ namespace NHibernate.Test.NHSpecificTest.NH1502
 			this.name = name;
 			this.iq = iq;
 			this.shoeSize = shoeSize;
-			pets = new ArrayList();
 		}
 
 		public virtual int Id
@@ -46,6 +41,5 @@ namespace NHibernate.Test.NHSpecificTest.NH1502
 			get { return shoeSize; }
 			set { shoeSize = value; }
 		}
-
 	}
 }

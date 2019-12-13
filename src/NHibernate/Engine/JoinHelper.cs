@@ -4,12 +4,8 @@ using NHibernate.Util;
 
 namespace NHibernate.Engine
 {
-	public sealed class JoinHelper
+	public static class JoinHelper
 	{
-		private JoinHelper()
-		{
-		}
-
 		public static ILhsAssociationTypeSqlInfo GetLhsSqlInfo(string alias, int property,
 																										IOuterJoinLoadable lhsPersister, IMapping mapping)
 		{
@@ -73,7 +69,6 @@ namespace NHibernate.Engine
 		public IMapping Mapping { get; private set; }
 
 		#region Implementation of ILhsAssociationTypeSqlInfo
-
 
 		public string[] GetAliasedColumnNames(IAssociationType type, int begin)
 		{
@@ -211,5 +206,4 @@ namespace NHibernate.Engine
 
 		#endregion
 	}
-
 }

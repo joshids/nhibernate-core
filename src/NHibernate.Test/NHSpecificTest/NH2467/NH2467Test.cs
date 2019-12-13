@@ -38,7 +38,6 @@ namespace NHibernate.Test.NHSpecificTest.NH2467
 		{
 			using (var session = OpenSession())
 			{
-			
 				var contentQuery = session
 					.CreateCriteria<DomainClass>()
 					.Add(Restrictions.Eq("Data", "Test"));
@@ -53,7 +52,7 @@ namespace NHibernate.Test.NHSpecificTest.NH2467
 				var count = countQuery.FutureValue<int>();
 
 				// triggers batch operation, should not throw
-				var result = content.ToList();
+				var result = content.GetEnumerable().ToList();
 			}
 		}		
 		
@@ -62,7 +61,6 @@ namespace NHibernate.Test.NHSpecificTest.NH2467
 		{
 			using (var session = OpenSession())
 			{
-			
 				var countQuery = session
 					.CreateCriteria<DomainClass>()
 					.Add(Restrictions.Eq("Data", "Test"));
@@ -77,7 +75,7 @@ namespace NHibernate.Test.NHSpecificTest.NH2467
 				var content = contentQuery.Future<DomainClass>();
 
 				// triggers batch operation, should not throw
-				var result = content.ToList();
+				var result = content.GetEnumerable().ToList();
 			}
 		}		
 		
@@ -86,7 +84,6 @@ namespace NHibernate.Test.NHSpecificTest.NH2467
 		{
 			using (var session = OpenSession())
 			{
-
 				var contentQuery = session.CreateQuery("from DomainClass as d where d.Data = ?");
 				contentQuery.SetString(0, "Test");
 				contentQuery.SetMaxResults(2);
@@ -97,7 +94,7 @@ namespace NHibernate.Test.NHSpecificTest.NH2467
 				countQuery.SetString(0, "Test");
 				var count = countQuery.FutureValue<long>();
 				
-				Assert.AreEqual(1, content.ToList().Count);
+				Assert.AreEqual(1, content.GetEnumerable().ToList().Count);
 				Assert.AreEqual(1, count.Value);
 			}
 		}
@@ -107,7 +104,6 @@ namespace NHibernate.Test.NHSpecificTest.NH2467
 		{
 			using (var session = OpenSession())
 			{
-
 				var contentQuery = session.CreateQuery("from DomainClass as d where d.Data = ?");
 				contentQuery.SetString(0, "Test");
 				contentQuery.SetMaxResults(2);
@@ -118,7 +114,7 @@ namespace NHibernate.Test.NHSpecificTest.NH2467
 				countQuery.SetString(0, "Test");
 				var count = countQuery.FutureValue<long>();
 				
-				Assert.AreEqual(1, content.ToList().Count);
+				Assert.AreEqual(1, content.GetEnumerable().ToList().Count);
 				Assert.AreEqual(1, count.Value);
 			}
 		}

@@ -13,6 +13,7 @@ using NHibernate.Hql.Ast.ANTLR.Tree;
 using NHibernate.Hql.Ast.ANTLR.Util;
 using NHibernate.Loader.Hql;
 using NHibernate.Param;
+using NHibernate.Persister.Collection;
 using NHibernate.SqlCommand;
 using NHibernate.Type;
 using NHibernate.Util;
@@ -21,9 +22,9 @@ using IQueryable = NHibernate.Persister.Entity.IQueryable;
 namespace NHibernate.Hql.Ast.ANTLR
 {
 	[CLSCompliant(false)]
-	public class QueryTranslatorImpl : IFilterTranslator
+	public partial class QueryTranslatorImpl : IFilterTranslator
 	{
-		private static readonly IInternalLogger log = LoggerProvider.LoggerFor(typeof(QueryTranslatorImpl));
+		private static readonly INHibernateLogger log = NHibernateLogger.For(typeof(QueryTranslatorImpl));
 
 		private readonly string _queryIdentifier;
 		private readonly IASTNode _stageOneAst;
@@ -177,7 +178,7 @@ namespace NHibernate.Hql.Ast.ANTLR
 
 		public virtual IType[] ActualReturnTypes
 		{
-			get { return _queryLoader.ReturnTypes; }
+			get { return _queryLoader.ResultTypes; }
 		}
 
 		public ParameterMetadata BuildParameterMetadata()
@@ -284,8 +285,25 @@ namespace NHibernate.Hql.Ast.ANTLR
 			get
 			{
 				ErrorIfDML();
-				IList<IASTNode> collectionFetches = ((QueryNode)_sqlAst).FromClause.GetCollectionFetches();
-				return collectionFetches != null && collectionFetches.Count > 0;
+				var collectionFetches = ((QueryNode)_sqlAst).FromClause.GetCollectionFetchesTyped();
+				return collectionFetches.Count > 0;
+			}
+		}
+
+		public ISet<ICollectionPersister> UncacheableCollectionPersisters
+		{
+			get
+			{
+				ErrorIfDML();
+				var persisters =
+					ASTUtil.IterateChildrenOfType<FromReferenceNode>(
+						       ((QueryNode) _sqlAst).WhereClause,
+						       skipSearchInChildrenWhen: node => node.FromElement != null)
+					       .Select(rn => rn.FromElement)
+					       .Where(fr => fr?.IsFetch == true && fr.QueryableCollection?.HasCache == true)
+					       .Select(fr => fr.QueryableCollection);
+
+				return new HashSet<ICollectionPersister>(persisters);
 			}
 		}
 
@@ -310,7 +328,7 @@ namespace NHibernate.Hql.Ast.ANTLR
 			// If the query is already compiled, skip the compilation.
 			if ( _compiled ) 
 			{
-				if ( log.IsDebugEnabled ) 
+				if ( log.IsDebugEnabled() ) 
 				{
 					log.Debug( "compile() : The query is already compiled, skipping..." );
 				}
@@ -362,11 +380,9 @@ namespace NHibernate.Hql.Ast.ANTLR
 			}
 			catch ( RecognitionException e ) 
 			{
-				// we do not actually propogate ANTLRExceptions as a cause, so
-				// log it here for diagnostic purposes
-				if ( log.IsInfoEnabled ) 
+				if ( log.IsInfoEnabled() ) 
 				{
-					log.Info( "converted antlr.RecognitionException", e );
+					log.Info(e, "converted antlr.RecognitionException");
 				}
 				throw QuerySyntaxException.Convert(e, _queryIdentifier);
 			}
@@ -436,7 +452,7 @@ namespace NHibernate.Hql.Ast.ANTLR
 
 	public class HqlParseEngine
 	{
-		private static readonly IInternalLogger log = LoggerProvider.LoggerFor(typeof(HqlParseEngine));
+		private static readonly INHibernateLogger log = NHibernateLogger.For(typeof(HqlParseEngine));
 
 		private readonly string _hql;
 		private CommonTokenStream _tokens;
@@ -458,9 +474,9 @@ namespace NHibernate.Hql.Ast.ANTLR
 
 			var parser = new HqlParser(_tokens) {TreeAdaptor = new ASTTreeAdaptor(), Filter = _filter};
 
-			if (log.IsDebugEnabled)
+			if (log.IsDebugEnabled())
 			{
-				log.Debug("parse() - HQL: " + _hql);
+				log.Debug("parse() - HQL: {0}", _hql);
 			}
 
 			try
@@ -553,7 +569,12 @@ namespace NHibernate.Hql.Ast.ANTLR
 		{
 			if (_resultAst == null)
 			{
-				var nodes = new HqlSqlWalkerTreeNodeStream(_inputAst);
+				if (_collectionRole != null)
+				{
+					HqlFilterPreprocessor.AddImpliedFromToQuery(_inputAst, _collectionRole, _sfi);
+				}
+
+				var nodes = new BufferedTreeNodeStream(_inputAst);
 
 				var hqlSqlWalker = new HqlSqlWalker(_qti, _sfi, nodes, _tokenReplacements, _collectionRole);
 				hqlSqlWalker.TreeAdaptor = new HqlSqlWalkerTreeAdaptor(hqlSqlWalker);
@@ -575,7 +596,7 @@ namespace NHibernate.Hql.Ast.ANTLR
 
 	internal class HqlSqlGenerator
 	{
-		private static readonly IInternalLogger log = LoggerProvider.LoggerFor(typeof(HqlSqlGenerator));
+		private static readonly INHibernateLogger log = NHibernateLogger.For(typeof(HqlSqlGenerator));
 
 		private readonly IASTNode _ast;
 		private readonly ISessionFactoryImplementor _sfi;
@@ -610,9 +631,9 @@ namespace NHibernate.Hql.Ast.ANTLR
 
 					_sql = gen.GetSQL();
 
-					if (log.IsDebugEnabled)
+					if (log.IsDebugEnabled())
 					{
-						log.Debug("SQL: " + _sql);
+						log.Debug("SQL: {0}", _sql);
 					}
 				}
 				finally

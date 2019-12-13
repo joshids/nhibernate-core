@@ -1,6 +1,8 @@
 using System;
 using System.Collections;
-
+using System.Threading;
+using System.Threading.Tasks;
+using NHibernate.Action;
 using NHibernate.Collection;
 using NHibernate.Impl;
 using NHibernate.Persister.Collection;
@@ -12,9 +14,9 @@ namespace NHibernate.Engine
 	/// of a collection with respect to its persistent state
 	/// </summary>
 	[Serializable]
-	public class CollectionEntry
+	public partial class CollectionEntry
 	{
-		private static readonly IInternalLogger log = LoggerProvider.LoggerFor(typeof (CollectionEntry));
+		private static readonly INHibernateLogger log = NHibernateLogger.For(typeof (CollectionEntry));
 
 		/// <summary>session-start/post-flush persistent state</summary>
 		private object snapshot;
@@ -127,7 +129,7 @@ namespace NHibernate.Engine
 
 		/// <summary> For collections just loaded from the database</summary>
 		public CollectionEntry(IPersistentCollection collection, ICollectionPersister loadedPersister, object loadedKey,
-		                       bool ignore)
+							   bool ignore)
 		{
 			this.ignore = ignore;
 			this.loadedKey = loadedKey;
@@ -256,9 +258,9 @@ namespace NHibernate.Engine
 			// if the collection is initialized and it was previously persistent
 			// initialize the dirty flag
 			bool forceDirty = collection.WasInitialized && !collection.IsDirty && LoadedPersister != null
-			                  && LoadedPersister.IsMutable
-			                  && (collection.IsDirectlyAccessible || LoadedPersister.ElementType.IsMutable)
-			                  && !collection.EqualsSnapshot(LoadedPersister);
+							  && LoadedPersister.IsMutable
+							  && (collection.IsDirectlyAccessible || LoadedPersister.ElementType.IsMutable)
+							  && !collection.EqualsSnapshot(LoadedPersister);
 
 			if (forceDirty)
 			{
@@ -279,9 +281,9 @@ namespace NHibernate.Engine
 			}
 			Dirty(collection);
 
-			if (log.IsDebugEnabled && collection.IsDirty && loadedPersister != null)
+			if (log.IsDebugEnabled() && collection.IsDirty && loadedPersister != null)
 			{
-				log.Debug("Collection dirty: " + MessageHelper.InfoString(loadedPersister, loadedKey));
+				log.Debug("Collection dirty: {0}", MessageHelper.CollectionInfoString(loadedPersister, loadedKey));
 			}
 
 			// reset all of these values so any previous flush status 
@@ -298,10 +300,30 @@ namespace NHibernate.Engine
 		/// has been initialized.
 		/// </summary>
 		/// <param name="collection">The initialized <see cref="AbstractPersistentCollection"/> that this Entry is for.</param>
+		//Since v5.1
+		[Obsolete("Please use PostInitialize(collection, persistenceContext) instead.")]
 		public void PostInitialize(IPersistentCollection collection)
 		{
 			snapshot = LoadedPersister.IsMutable ? collection.GetSnapshot(LoadedPersister) : null;
 			collection.SetSnapshot(loadedKey, role, snapshot);
+		}
+
+		/// <summary>
+		/// Updates the CollectionEntry to reflect that the <see cref="IPersistentCollection"/>
+		/// has been initialized.
+		/// </summary>
+		/// <param name="collection">The initialized <see cref="AbstractPersistentCollection"/> that this Entry is for.</param>
+		/// <param name="persistenceContext"></param>
+		public void PostInitialize(IPersistentCollection collection, IPersistenceContext persistenceContext)
+		{
+#pragma warning disable 618
+			//6.0 TODO: Inline PostInitialize here.
+			PostInitialize(collection);
+#pragma warning restore 618
+			if (LoadedPersister.GetBatchSize() > 1)
+			{
+				persistenceContext.BatchFetchQueue.RemoveBatchLoadableCollection(this);
+			}
 		}
 
 		/// <summary>
@@ -367,6 +389,23 @@ namespace NHibernate.Engine
 				throw new AssertionFailure("no collection snapshot for orphan delete");
 			}
 			return collection.GetOrphans(snapshot, entityName);
+		}
+
+		//Since 5.3
+		[Obsolete("This method has no more usages and will be removed in a future version")]
+		public Task<ICollection> GetOrphansAsync(string entityName, IPersistentCollection collection, CancellationToken cancellationToken)
+		{
+			if (snapshot == null)
+			{
+				throw new AssertionFailure("no collection snapshot for orphan delete");
+			}
+			
+			if (cancellationToken.IsCancellationRequested)
+			{
+				return Task.FromCanceled<ICollection>(cancellationToken);
+			}
+
+			return collection.GetOrphansAsync(snapshot, entityName, cancellationToken);
 		}
 
 		public bool IsSnapshotEmpty(IPersistentCollection collection)

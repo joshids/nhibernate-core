@@ -25,14 +25,12 @@ namespace NHibernate
 			this.propertyName = propertyName;
 		}
 
-
 		public PropertyValueException(string message, string entityName, string propertyName, Exception innerException)
 			: base(message, innerException)
 		{
 			this.entityName = entityName;
 			this.propertyName = propertyName;
 		}
-
 
 		public string EntityName
 		{
@@ -84,11 +82,7 @@ namespace NHibernate
 		/// <param name="context">
 		/// The <see cref="StreamingContext"/> that contains contextual information about the source or destination.
 		/// </param>
-#if NET_4_0
 		[SecurityCritical]
-#else
-		[SecurityPermission(SecurityAction.LinkDemand, Flags = SecurityPermissionFlag.SerializationFormatter)]
-#endif
 		public override void GetObjectData(SerializationInfo info, StreamingContext context)
 		{
 			base.GetObjectData(info, context);
